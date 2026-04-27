@@ -1,0 +1,25 @@
+{
+  "_comentario": "Datos de prueba para el flujo de Complemento de Pago (CFDI tipo P). Actualizar con UUID real del PPD.",
+  "uuid_cfdi_ppd": "TODO-REEMPLAZAR-UUID-PPD-REAL",
+  "serie_cp": "CP",
+  "folio_cp": "2001",
+  "fecha_pago": "2025-07-15T12:00:00",
+  "forma_pago": "03",
+  "moneda": "MXN",
+  "tipo_cambio": 1.0,
+  "monto": 50000.00,
+  "documentos_relacionados": [
+    {
+      "uuid_relacionado": "TODO-REEMPLAZAR-UUID-PPD-REAL",
+      "serie": "A",
+      "folio": "1001",
+      "moneda_dr": "MXN",
+      "metodo_pago": "PPD",
+      "num_parcialidad": 1,
+      "importe_saldo_anterior": 50000.00,
+      "importe_pagado": 50000.00,
+      "importe_saldo_insoluto": 0.00,
+      "objeto_imp": "02"
+    }
+  ]
+}

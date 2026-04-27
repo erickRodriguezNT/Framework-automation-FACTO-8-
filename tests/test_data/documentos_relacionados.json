@@ -1,0 +1,31 @@
+{
+  "_comentario": "Catálogo de documentos relacionados reutilizables entre tests. Reemplazar UUIDs con valores reales del ambiente.",
+  "facturas_ingreso": [
+    {
+      "id": "factura_pue_01",
+      "uuid": "TODO-REEMPLAZAR-UUID",
+      "rfc_emisor": "EKU9003173C9",
+      "rfc_receptor": "XAXX010101000",
+      "total": 11600.00,
+      "moneda": "MXN",
+      "metodo_pago": "PUE",
+      "fecha_timbrado": "2025-07-01T10:00:00"
+    }
+  ],
+  "facturas_ppd": [
+    {
+      "id": "factura_ppd_01",
+      "uuid": "TODO-REEMPLAZAR-UUID",
+      "rfc_emisor": "EKU9003173C9",
+      "rfc_receptor": "XAXX010101000",
+      "total": 58000.00,
+      "saldo_pendiente": 58000.00,
+      "moneda": "MXN",
+      "metodo_pago": "PPD",
+      "fecha_timbrado": "2025-07-01T11:00:00"
+    }
+  ],
+  "complementos_pago": [],
+  "notas_credito": [],
+  "adendas": []
+}

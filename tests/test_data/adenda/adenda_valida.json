@@ -1,0 +1,10 @@
+{
+  "_comentario": "Datos de prueba para el flujo de Adenda. Actualizar con UUID real del CFDI base.",
+  "uuid_cfdi_base": "TODO-REEMPLAZAR-UUID-CFDI-REAL",
+  "tipo_adenda": "COMERCIAL",
+  "referencia_orden_compra": "OC-2025-001",
+  "numero_proveedor": "PROV-12345",
+  "descripcion": "Descripción de la adenda de prueba",
+  "campo_extra_1": "",
+  "campo_extra_2": ""
+}

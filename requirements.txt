@@ -1,0 +1,43 @@
+# ============================================================
+# FACTO 8 Automation Framework - Dependencias
+# Python 3.11+
+# ============================================================
+
+# --- Automatización web ---
+selenium==4.20.0
+webdriver-manager==4.0.1
+
+# --- Framework de testing ---
+pytest==8.2.0
+pytest-bdd==7.2.0
+pytest-html==4.1.1
+pytest-xdist==3.5.0
+
+# --- Reporting Allure ---
+allure-pytest==2.13.5
+allure-python-commons==2.13.5
+
+# --- Configuración / variables de entorno ---
+python-dotenv==1.0.1
+
+# --- Lógica de reintentos ---
+tenacity==8.3.0
+
+# --- Logging estructurado ---
+loguru==0.7.2
+
+# --- Procesamiento XML ---
+lxml==5.2.1
+
+# --- Lectura de datos Excel (data-driven testing) ---
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# --- Generación de reportes PDF ---
+reportlab==4.1.0
+
+# --- Procesamiento de imágenes (screenshots) ---
+Pillow==10.3.0
+
+# --- HTTP (para validaciones de API futuras) ---
+requests==2.31.0

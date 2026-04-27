@@ -1,0 +1,22 @@
+{
+  "_comentario": "Datos de prueba para el flujo de Factura PPD (método de pago PPD). Actualizar con datos reales.",
+  "rfc_receptor": "XAXX010101000",
+  "nombre_receptor": "CLIENTE GENERICO SA DE CV",
+  "uso_cfdi": "G03",
+  "metodo_pago": "PPD",
+  "forma_pago": "99",
+  "condiciones_pago": "NET30",
+  "descripcion": "Servicios profesionales de consultoría",
+  "importe": 50000.00,
+  "moneda": "MXN",
+  "conceptos": [
+    {
+      "clave_prod_serv": "43232404",
+      "descripcion": "Servicios profesionales de consultoría",
+      "cantidad": 1,
+      "clave_unidad": "E48",
+      "precio_unitario": 50000.00,
+      "objeto_imp": "02"
+    }
+  ]
+}

@@ -1,0 +1,1001 @@
+import {
+  provideQuillConfig
+} from "./chunk-37XIDWTP.js";
+import "./chunk-SGILF7OG.js";
+import {
+  provideAuth0
+} from "./chunk-7YQLP6ZV.js";
+import {
+  AutorizacionService
+} from "./chunk-AZDO2OSL.js";
+import "./chunk-6VLLQAQH.js";
+import {
+  environment
+} from "./chunk-QPXTOAGY.js";
+import {
+  Router,
+  RouterOutlet,
+  provideRouter
+} from "./chunk-GXHCDXQE.js";
+import {
+  bootstrapApplication
+} from "./chunk-RUPW574G.js";
+import {
+  HttpClient,
+  HttpContext,
+  HttpHeaders,
+  provideHttpClient
+} from "./chunk-N6IS3PEL.js";
+import "./chunk-O76I7UR2.js";
+import {
+  APOLLO_NAMED_OPTIONS,
+  ApolloLink,
+  InMemoryCache,
+  print,
+  provideApollo
+} from "./chunk-4LTURHXJ.js";
+import "./chunk-NO4PKEDW.js";
+import {
+  Component,
+  EMPTY,
+  Injectable,
+  Observable,
+  catchError,
+  inject,
+  map,
+  of,
+  provideZoneChangeDetection,
+  setClassMetadata,
+  take,
+  ɵsetClassDebugInfo,
+  ɵɵdefineComponent,
+  ɵɵdefineInjectable,
+  ɵɵelement,
+  ɵɵinject
+} from "./chunk-CARAV3S4.js";
+import {
+  __spreadProps,
+  __spreadValues
+} from "./chunk-PIW2SP2J.js";
+
+// src/app/shared/guards/auth.guard.ts
+var authGuard = (route, state) => {
+  const router = inject(Router);
+  const autorizacionService = inject(AutorizacionService);
+  const token = sessionStorage.getItem("token");
+  const dataUserStr = sessionStorage.getItem("dataUser");
+  if (!token || !dataUserStr) {
+    router.navigate(["/autenticacion/login"], {
+      queryParams: { returnUrl: state.url }
+    });
+    return false;
+  }
+  try {
+    const dataUser = JSON.parse(dataUserStr);
+    const permisosActuales = autorizacionService.getPermisos();
+    const isAdmin = autorizacionService.isAdmin();
+    const hayPermisosEnMemoria = permisosActuales.length > 0 || isAdmin;
+    const rolId = dataUser.rol?.id ?? null;
+    if (!hayPermisosEnMemoria && rolId) {
+      return autorizacionService.cargarPermisos(rolId).pipe(map((permisos) => {
+        return true;
+      }), catchError((error) => {
+        console.error("[AuthGuard] Error al cargar permisos:", error);
+        return of(true);
+      }), take(1));
+    }
+  } catch (error) {
+    console.error("[AuthGuard] Error al parsear dataUser:", error);
+  }
+  return true;
+};
+var permisoGuard = (route, state) => {
+  const autorizacionService = inject(AutorizacionService);
+  const router = inject(Router);
+  const recurso = route.data["recurso"];
+  if (!recurso) {
+    console.error("[PermisoGuard] No se especific\xF3 el recurso en data.recurso");
+    return false;
+  }
+  const isAdmin = autorizacionService.isAdmin();
+  const permisos = autorizacionService.getPermisos();
+  const tieneAcceso = autorizacionService.tieneAccesoRecurso(recurso);
+  if (!tieneAcceso) {
+    console.warn("[PermisoGuard] \u274C Acceso DENEGADO al recurso:", recurso);
+    router.navigate(["/home"]);
+    return false;
+  }
+  return true;
+};
+var accionGuard = (route, state) => {
+  const autorizacionService = inject(AutorizacionService);
+  const router = inject(Router);
+  const recurso = route.data["recurso"];
+  const accion = route.data["accion"];
+  if (!recurso || !accion) {
+    console.error("Guard accionGuard: Se requieren data.recurso y data.accion");
+    return false;
+  }
+  const tieneAcceso = autorizacionService.tieneAccesoAccion(recurso, accion);
+  if (!tieneAcceso) {
+    router.navigate([recurso]);
+    return false;
+  }
+  return true;
+};
+
+// src/app/app.routes.ts
+var routes = [
+  {
+    path: "",
+    redirectTo: "autenticacion/login",
+    pathMatch: "full"
+  },
+  {
+    path: "autenticacion",
+    children: [
+      {
+        path: "login",
+        loadComponent: () => import("./chunk-J24JMJXW.js").then((m) => m.LoginComponent)
+      }
+    ]
+  },
+  {
+    path: "home",
+    loadComponent: () => import("./chunk-WU3N4ARG.js").then((m) => m.MainTemplateComponent),
+    canActivate: [authGuard],
+    children: [
+      {
+        path: "administracion",
+        children: [
+          {
+            path: "corporativo",
+            loadComponent: () => import("./chunk-C2UKXFR5.js").then((m) => m.CorporativoComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/administracion/corporativo" }
+          },
+          {
+            path: "emisores",
+            loadComponent: () => import("./chunk-DMAGZJG5.js").then((m) => m.EmisoresComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/administracion/emisores" }
+          },
+          {
+            path: "crear_emisor",
+            loadComponent: () => import("./chunk-VKBXMMLG.js").then((m) => m.CrearEmisorComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/emisores", accion: "crear_emisor" }
+          },
+          {
+            path: "editar_emisor",
+            loadComponent: () => import("./chunk-5CJAFPW7.js").then((m) => m.EditarEmisorComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/emisores", accion: "editar_emisor" }
+          },
+          {
+            path: "gestionar_certificado_emisor",
+            loadComponent: () => import("./chunk-DUITEBA3.js").then((m) => m.GestionarCertificadoComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/emisores", accion: "gestionar_certificado" }
+          },
+          {
+            path: "sucursales",
+            loadComponent: () => import("./chunk-VYU5ITFH.js").then((m) => m.SucursalesComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/administracion/sucursales" }
+          },
+          {
+            path: "crear_sucursal",
+            loadComponent: () => import("./chunk-DB55CS7G.js").then((m) => m.CrearSucursalComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/sucursales", accion: "crear_sucursal" }
+          },
+          {
+            path: "editar_sucursal",
+            loadComponent: () => import("./chunk-WWS7FR4Z.js").then((m) => m.EditarSucursalComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/sucursales", accion: "editar_sucursal" }
+          },
+          {
+            path: "centros_consumo",
+            loadComponent: () => import("./chunk-TOE4K7OS.js").then((m) => m.CentrosConsumoComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/administracion/centros_consumo" }
+          },
+          {
+            path: "crear_centro_consumo",
+            loadComponent: () => import("./chunk-P6ZAXPDU.js").then((m) => m.CrearCentroConsumoComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/centros_consumo", accion: "crear_centro_consumo" }
+          },
+          {
+            path: "editar_centro_consumo",
+            loadComponent: () => import("./chunk-RJNF5L3G.js").then((m) => m.EditarCentroConsumoComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/centros_consumo", accion: "editar_centro_consumo" }
+          },
+          {
+            path: "integraciones",
+            loadComponent: () => import("./chunk-7AWQLPT5.js").then((m) => m.IntegracionesComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/administracion/integraciones" }
+          },
+          {
+            path: "crear_integracion",
+            loadComponent: () => import("./chunk-7QKVELC2.js").then((m) => m.CrearIntegracionComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/integraciones", accion: "crear_integracion" }
+          },
+          {
+            path: "editar_integracion",
+            loadComponent: () => import("./chunk-MMSCOHKV.js").then((m) => m.EditarIntegracionComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/integraciones", accion: "editar_integracion" }
+          },
+          {
+            path: "usuarios",
+            loadComponent: () => import("./chunk-UECF4R7A.js").then((m) => m.UsuariosComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/administracion/usuarios" }
+          },
+          {
+            path: "roles",
+            loadComponent: () => import("./chunk-F7GJDZSX.js").then((m) => m.RolesComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/administracion/roles" }
+          },
+          {
+            path: "crear_rol",
+            loadComponent: () => import("./chunk-BGJNWMTX.js").then((m) => m.CrearRolComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/roles", accion: "crear_rol" }
+          },
+          {
+            path: "editar_rol",
+            loadComponent: () => import("./chunk-DIE7SBJT.js").then((m) => m.EditarRolComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/administracion/roles", accion: "editar_rol" }
+          }
+        ]
+      },
+      {
+        path: "configuracion",
+        children: [
+          {
+            path: "series",
+            loadComponent: () => import("./chunk-5QPWTQFS.js").then((m) => m.SeriesComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/configuracion/series" }
+          },
+          {
+            path: "addendas",
+            loadComponent: () => import("./chunk-AYSSVL3V.js").then((m) => m.AddendasComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/configuracion/addendas" }
+          },
+          {
+            path: "receptores",
+            loadComponent: () => import("./chunk-7DJMLZRO.js").then((m) => m.ReceptorComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/configuracion/receptores" }
+          },
+          {
+            path: "crear_receptor",
+            loadComponent: () => import("./chunk-2VEBBYPR.js").then((m) => m.AgregarReceptorComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/configuracion/receptores", accion: "crear_receptor" }
+          },
+          {
+            path: "editar_receptor",
+            loadComponent: () => import("./chunk-2LHD4FID.js").then((m) => m.EditarReceptorComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/configuracion/receptores", accion: "editar_receptor" }
+          },
+          {
+            path: "plantillas-email",
+            loadComponent: () => import("./chunk-E7B754TB.js").then((m) => m.PlantillaEmailComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/configuracion/plantillas-email" }
+          },
+          {
+            path: "crear_plantilla_email",
+            loadComponent: () => import("./chunk-CY2I7ZAN.js").then((m) => m.CrearPlantillaEmailComponent)
+          },
+          {
+            path: "editar_plantilla_email",
+            loadComponent: () => import("./chunk-IKEK5KUF.js").then((m) => m.EditarPlantillaEmailComponent)
+          },
+          {
+            path: "conceptos",
+            loadComponent: () => import("./chunk-SOSEQANV.js").then((m) => m.ConceptosComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/configuracion/conceptos" }
+          },
+          {
+            path: "autoportales",
+            loadComponent: () => import("./chunk-GE2W4FOZ.js").then((m) => m.AutoportalesComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/configuracion/autoportales" }
+          },
+          {
+            path: "crear_autoportal",
+            loadComponent: () => import("./chunk-7TQE7CNK.js").then((m) => m.CrearAutoportalComponent),
+            canActivate: [accionGuard],
+            data: { recurso: "/home/configuracion/autoportales", accion: "crear_autoportal" }
+          }
+        ]
+      },
+      {
+        path: "reporteria",
+        children: [
+          {
+            path: "visor_emitidas",
+            loadComponent: () => import("./chunk-YRQPZB5Q.js").then((m) => m.VisorCfdiEmitidasComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/reporteria/visor_emitidas" }
+          },
+          {
+            path: "visor_tickets",
+            loadComponent: () => import("./chunk-W45QW5IT.js").then((m) => m.VisorTicketsComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/reporteria/visor_tickets" }
+          },
+          {
+            path: "ver_reportes",
+            loadComponent: () => import("./chunk-2RWUMTMO.js").then((m) => m.VisorReportesGeneradosComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/reporteria/ver_reportes" }
+          },
+          {
+            path: "descargas_masivas",
+            loadComponent: () => import("./chunk-XLOWHWWY.js").then((m) => m.VisorDescargasGeneradasComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/reporteria/descargas_masivas" }
+          }
+        ]
+      },
+      {
+        path: "facturacion",
+        children: [
+          {
+            path: "factura",
+            loadComponent: () => import("./chunk-XSSF24SQ.js").then((m) => m.FacturaComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/factura" }
+          },
+          {
+            path: "pago",
+            loadComponent: () => import("./chunk-2T3YHXJG.js").then((m) => m.PagoComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/pago" }
+          },
+          {
+            path: "nota_credito",
+            loadComponent: () => import("./chunk-IIWWRZBZ.js").then((m) => m.NotaCreditoComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/nota_credito" }
+          },
+          {
+            path: "traslado",
+            loadComponent: () => import("./chunk-ROYJ234N.js").then((m) => m.TrasladoComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/traslado" }
+          },
+          {
+            path: "anticipo",
+            loadComponent: () => import("./chunk-UVJ5WZ6D.js").then((m) => m.AnticiposComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/anticipo" }
+          },
+          {
+            path: "cartaporte",
+            loadComponent: () => import("./chunk-PW7BEU6V.js").then((m) => m.CartaPorteComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/cartaporte" }
+          },
+          {
+            path: "crear_detallista",
+            loadComponent: () => import("./chunk-EDDQKSGE.js").then((m) => m.DetallistaComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/crear_detallista" }
+          },
+          {
+            path: "crear_cfdi_batch",
+            loadComponent: () => import("./chunk-I2YKCUKE.js").then((m) => m.CfdiBatchComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/crear_cfdi_batch" }
+          },
+          {
+            path: "crear_retencion",
+            loadComponent: () => import("./chunk-EKPKAA3R.js").then((m) => m.RetencionComponent),
+            canActivate: [permisoGuard],
+            data: { recurso: "/home/facturacion/crear_retencion" }
+          }
+        ]
+      }
+    ]
+  }
+];
+
+// node_modules/@apollo/client/link/batch/batching.js
+var OperationBatcher = class {
+  // Queue on which the QueryBatcher will operate on a per-tick basis.
+  batchesByKey = /* @__PURE__ */ new Map();
+  scheduledBatchTimerByKey = /* @__PURE__ */ new Map();
+  batchDebounce;
+  batchInterval;
+  batchMax;
+  //This function is called to the queries in the queue to the server.
+  batchHandler;
+  batchKey;
+  constructor({
+    batchDebounce,
+    batchInterval,
+    batchMax,
+    batchHandler,
+    batchKey
+  }) {
+    this.batchDebounce = batchDebounce;
+    this.batchInterval = batchInterval;
+    this.batchMax = batchMax || 0;
+    this.batchHandler = batchHandler;
+    this.batchKey = batchKey || (() => "");
+  }
+  enqueueRequest(request) {
+    const requestCopy = __spreadProps(__spreadValues({}, request), {
+      next: [],
+      error: [],
+      complete: [],
+      subscribers: /* @__PURE__ */ new Set()
+    });
+    const key = this.batchKey(request.operation);
+    if (!requestCopy.observable) {
+      requestCopy.observable = new Observable((observer) => {
+        let batch = this.batchesByKey.get(key);
+        if (!batch) this.batchesByKey.set(key, batch = /* @__PURE__ */ new Set());
+        const isFirstEnqueuedRequest = batch.size === 0;
+        const isFirstSubscriber = requestCopy.subscribers.size === 0;
+        requestCopy.subscribers.add(observer);
+        if (isFirstSubscriber) {
+          batch.add(requestCopy);
+        }
+        if (observer.next) {
+          requestCopy.next.push(observer.next.bind(observer));
+        }
+        if (observer.error) {
+          requestCopy.error.push(observer.error.bind(observer));
+        }
+        if (observer.complete) {
+          requestCopy.complete.push(observer.complete.bind(observer));
+        }
+        if (isFirstEnqueuedRequest || this.batchDebounce) {
+          this.scheduleQueueConsumption(key);
+        }
+        if (batch.size === this.batchMax) {
+          this.consumeQueue(key);
+        }
+        return () => {
+          if (requestCopy.subscribers.delete(observer) && requestCopy.subscribers.size < 1) {
+            if (batch.delete(requestCopy) && batch.size < 1) {
+              this.consumeQueue(key);
+              batch.subscription?.unsubscribe();
+            }
+          }
+        };
+      });
+    }
+    return requestCopy.observable;
+  }
+  // Consumes the queue.
+  // Returns a list of promises (one for each query).
+  consumeQueue(key = "") {
+    const batch = this.batchesByKey.get(key);
+    this.batchesByKey.delete(key);
+    if (!batch || !batch.size) {
+      return;
+    }
+    const operations = [];
+    const forwards = [];
+    const observables = [];
+    const nexts = [];
+    const errors = [];
+    const completes = [];
+    batch.forEach((request) => {
+      operations.push(request.operation);
+      forwards.push(request.forward);
+      observables.push(request.observable);
+      nexts.push(request.next);
+      errors.push(request.error);
+      completes.push(request.complete);
+    });
+    const batchedObservable = this.batchHandler(operations, forwards);
+    const onError = (error) => {
+      errors.forEach((rejecters) => {
+        if (rejecters) {
+          rejecters.forEach((e) => e(error));
+        }
+      });
+    };
+    batch.subscription = batchedObservable.subscribe({
+      next: (results) => {
+        if (!Array.isArray(results)) {
+          results = [results];
+        }
+        if (nexts.length !== results.length) {
+          const error = new Error(`server returned results with length ${results.length}, expected length of ${nexts.length}`);
+          error.result = results;
+          return onError(error);
+        }
+        results.forEach((result, index) => {
+          if (nexts[index]) {
+            nexts[index].forEach((next) => next(result));
+          }
+        });
+      },
+      error: onError,
+      complete: () => {
+        completes.forEach((complete) => {
+          if (complete) {
+            complete.forEach((c) => c());
+          }
+        });
+      }
+    });
+    return observables;
+  }
+  scheduleQueueConsumption(key) {
+    clearTimeout(this.scheduledBatchTimerByKey.get(key));
+    this.scheduledBatchTimerByKey.set(key, setTimeout(() => {
+      this.consumeQueue(key);
+      this.scheduledBatchTimerByKey.delete(key);
+    }, this.batchInterval));
+  }
+};
+
+// node_modules/@apollo/client/link/batch/batchLink.js
+var BatchLink = class extends ApolloLink {
+  batcher;
+  constructor(options) {
+    super();
+    const {
+      batchDebounce,
+      batchInterval = 10,
+      batchMax = 0,
+      batchHandler = () => EMPTY,
+      batchKey = () => ""
+    } = options || {};
+    this.batcher = new OperationBatcher({
+      batchDebounce,
+      batchInterval,
+      batchMax,
+      batchHandler,
+      batchKey
+    });
+  }
+  request(operation, forward) {
+    return this.batcher.enqueueRequest({
+      operation,
+      forward
+    });
+  }
+};
+
+// node_modules/apollo-angular/fesm2022/apollo-angular-http.mjs
+var fetch = (req, httpClient, extractFiles) => {
+  const shouldUseBody = ["POST", "PUT", "PATCH"].indexOf(req.method.toUpperCase()) !== -1;
+  const shouldStringify = (param) => ["variables", "extensions"].indexOf(param.toLowerCase()) !== -1;
+  const isBatching = req.body.length;
+  let shouldUseMultipart = req.options && req.options.useMultipart;
+  let multipartInfo;
+  if (shouldUseMultipart) {
+    if (isBatching) {
+      return new Observable((observer) => observer.error(new Error("File upload is not available when combined with Batching")));
+    }
+    if (!shouldUseBody) {
+      return new Observable((observer) => observer.error(new Error("File upload is not available when GET is used")));
+    }
+    if (!extractFiles) {
+      return new Observable((observer) => observer.error(new Error(`To use File upload you need to pass "extractFiles" function from "extract-files" library to HttpLink's options`)));
+    }
+    multipartInfo = extractFiles(req.body);
+    shouldUseMultipart = !!multipartInfo.files.size;
+  }
+  let bodyOrParams = {};
+  if (isBatching) {
+    if (!shouldUseBody) {
+      return new Observable((observer) => observer.error(new Error("Batching is not available for GET requests")));
+    }
+    bodyOrParams = {
+      body: req.body
+    };
+  } else {
+    const body = shouldUseMultipart ? multipartInfo.clone : req.body;
+    if (shouldUseBody) {
+      bodyOrParams = {
+        body
+      };
+    } else {
+      const params = Object.keys(req.body).reduce((obj, param) => {
+        const value = req.body[param];
+        obj[param] = shouldStringify(param) ? JSON.stringify(value) : value;
+        return obj;
+      }, {});
+      bodyOrParams = {
+        params
+      };
+    }
+  }
+  if (shouldUseMultipart && shouldUseBody) {
+    const form = new FormData();
+    form.append("operations", JSON.stringify(bodyOrParams.body));
+    const map2 = {};
+    const files = multipartInfo.files;
+    let i = 0;
+    files.forEach((paths) => {
+      map2[++i] = paths;
+    });
+    form.append("map", JSON.stringify(map2));
+    i = 0;
+    files.forEach((_, file) => {
+      form.append(++i + "", file, file.name);
+    });
+    bodyOrParams.body = form;
+  }
+  return httpClient.request(req.method, req.url, __spreadValues(__spreadValues({
+    observe: "response",
+    responseType: "json",
+    reportProgress: false
+  }, bodyOrParams), req.options));
+};
+var mergeHeaders = (source, destination) => {
+  if (source && destination) {
+    const merged = destination.keys().reduce((headers, name) => headers.set(name, destination.getAll(name)), source);
+    return merged;
+  }
+  return destination || source;
+};
+var mergeHttpContext = (source, destination) => {
+  if (source && destination) {
+    return [...source.keys()].reduce((context, name) => context.set(name, source.get(name)), destination);
+  }
+  return destination || source;
+};
+function prioritize(...values) {
+  return values.find((val) => typeof val !== "undefined");
+}
+function createHeadersWithClientAwareness(context) {
+  let headers = context.headers && context.headers instanceof HttpHeaders ? context.headers : new HttpHeaders(context.headers);
+  if (context.clientAwareness) {
+    const {
+      name,
+      version
+    } = context.clientAwareness;
+    if (name && !headers.has("apollographql-client-name")) {
+      headers = headers.set("apollographql-client-name", name);
+    }
+    if (version && !headers.has("apollographql-client-version")) {
+      headers = headers.set("apollographql-client-version", version);
+    }
+  }
+  return headers;
+}
+var defaults = {
+  batchInterval: 10,
+  batchMax: 10,
+  uri: "graphql",
+  method: "POST",
+  withCredentials: false,
+  includeQuery: true,
+  includeExtensions: false,
+  useMultipart: false
+};
+function pick(context, options, key) {
+  return prioritize(context[key], options[key], defaults[key]);
+}
+var HttpBatchLinkHandler = class extends ApolloLink {
+  httpClient;
+  options;
+  batcher;
+  batchInterval;
+  batchMax;
+  print = print;
+  constructor(httpClient, options) {
+    super();
+    this.httpClient = httpClient;
+    this.options = options;
+    this.batchInterval = options.batchInterval || defaults.batchInterval;
+    this.batchMax = options.batchMax || defaults.batchMax;
+    if (this.options.operationPrinter) {
+      this.print = this.options.operationPrinter;
+    }
+    const batchHandler = (operations) => {
+      return new Observable((observer) => {
+        const body = this.createBody(operations);
+        const headers = this.createHeaders(operations);
+        const context = this.createHttpContext(operations);
+        const {
+          method,
+          uri,
+          withCredentials
+        } = this.createOptions(operations);
+        if (typeof uri === "function") {
+          throw new Error(`Option 'uri' is a function, should be a string`);
+        }
+        const req = {
+          method,
+          url: uri,
+          body,
+          options: {
+            withCredentials,
+            headers,
+            context
+          }
+        };
+        const sub = fetch(req, this.httpClient, () => {
+          throw new Error("File upload is not available when combined with Batching");
+        }).subscribe({
+          next: (result) => observer.next(result.body),
+          error: (err) => observer.error(err),
+          complete: () => observer.complete()
+        });
+        return () => {
+          if (!sub.closed) {
+            sub.unsubscribe();
+          }
+        };
+      });
+    };
+    const batchKey = options.batchKey || ((operation) => {
+      return this.createBatchKey(operation);
+    });
+    this.batcher = new BatchLink({
+      batchInterval: this.batchInterval,
+      batchMax: this.batchMax,
+      batchKey,
+      batchHandler
+    });
+  }
+  createOptions(operations) {
+    const context = operations[0].getContext();
+    return {
+      method: pick(context, this.options, "method"),
+      uri: pick(context, this.options, "uri"),
+      withCredentials: pick(context, this.options, "withCredentials")
+    };
+  }
+  createBody(operations) {
+    return operations.map((operation) => {
+      const includeExtensions = prioritize(operation.getContext().includeExtensions, this.options.includeExtensions, false);
+      const includeQuery = prioritize(operation.getContext().includeQuery, this.options.includeQuery, true);
+      const body = {
+        operationName: operation.operationName,
+        variables: operation.variables
+      };
+      if (includeExtensions) {
+        body.extensions = operation.extensions;
+      }
+      if (includeQuery) {
+        body.query = this.print(operation.query);
+      }
+      return body;
+    });
+  }
+  createHeaders(operations) {
+    return operations.reduce((headers, operation) => {
+      const {
+        headers: contextHeaders
+      } = operation.getContext();
+      return contextHeaders ? mergeHeaders(headers, contextHeaders) : headers;
+    }, createHeadersWithClientAwareness({
+      headers: this.options.headers,
+      clientAwareness: operations[0]?.getContext()?.clientAwareness
+    }));
+  }
+  createHttpContext(operations) {
+    return operations.reduce((context, operation) => {
+      const {
+        httpContext
+      } = operation.getContext();
+      return httpContext ? mergeHttpContext(httpContext, context) : context;
+    }, mergeHttpContext(this.options.httpContext, new HttpContext()));
+  }
+  createBatchKey(operation) {
+    const context = operation.getContext();
+    if (context.skipBatching) {
+      return Math.random().toString(36).substring(2, 11);
+    }
+    const headers = context.headers && context.headers.keys().map((k) => context.headers.get(k));
+    const opts = JSON.stringify({
+      includeQuery: context.includeQuery,
+      includeExtensions: context.includeExtensions,
+      headers
+    });
+    return prioritize(context.uri, this.options.uri, "") + opts;
+  }
+  request(op, forward) {
+    return this.batcher.request(op, forward);
+  }
+};
+var HttpBatchLink = class _HttpBatchLink {
+  httpClient;
+  constructor(httpClient) {
+    this.httpClient = httpClient;
+  }
+  create(options) {
+    return new HttpBatchLinkHandler(this.httpClient, options);
+  }
+  static \u0275fac = function HttpBatchLink_Factory(__ngFactoryType__) {
+    return new (__ngFactoryType__ || _HttpBatchLink)(\u0275\u0275inject(HttpClient));
+  };
+  static \u0275prov = /* @__PURE__ */ \u0275\u0275defineInjectable({
+    token: _HttpBatchLink,
+    factory: _HttpBatchLink.\u0275fac,
+    providedIn: "root"
+  });
+};
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpBatchLink, [{
+    type: Injectable,
+    args: [{
+      providedIn: "root"
+    }]
+  }], () => [{
+    type: HttpClient
+  }], null);
+})();
+var HttpLinkHandler = class extends ApolloLink {
+  httpClient;
+  options;
+  requester;
+  print = print;
+  constructor(httpClient, options) {
+    super();
+    this.httpClient = httpClient;
+    this.options = options;
+    if (this.options.operationPrinter) {
+      this.print = this.options.operationPrinter;
+    }
+    this.requester = (operation) => new Observable((observer) => {
+      const context = operation.getContext();
+      let method = pick(context, this.options, "method");
+      const includeQuery = pick(context, this.options, "includeQuery");
+      const includeExtensions = pick(context, this.options, "includeExtensions");
+      const url = pick(context, this.options, "uri");
+      const withCredentials = pick(context, this.options, "withCredentials");
+      const useMultipart = pick(context, this.options, "useMultipart");
+      const useGETForQueries = this.options.useGETForQueries === true;
+      const httpContext = mergeHttpContext(context.httpContext, mergeHttpContext(this.options.httpContext, new HttpContext()));
+      const isQuery = operation.query.definitions.some((def) => def.kind === "OperationDefinition" && def.operation === "query");
+      if (useGETForQueries && isQuery) {
+        method = "GET";
+      }
+      const req = {
+        method,
+        url: typeof url === "function" ? url(operation) : url,
+        body: {
+          operationName: operation.operationName,
+          variables: operation.variables
+        },
+        options: {
+          withCredentials,
+          useMultipart,
+          headers: this.options.headers,
+          context: httpContext
+        }
+      };
+      if (includeExtensions) {
+        req.body.extensions = operation.extensions;
+      }
+      if (includeQuery) {
+        req.body.query = this.print(operation.query);
+      }
+      const headers = createHeadersWithClientAwareness(context);
+      req.options.headers = mergeHeaders(req.options.headers, headers);
+      const sub = fetch(req, this.httpClient, this.options.extractFiles).subscribe({
+        next: (response) => {
+          operation.setContext({
+            response
+          });
+          observer.next(response.body);
+        },
+        error: (err) => observer.error(err),
+        complete: () => observer.complete()
+      });
+      return () => {
+        if (!sub.closed) {
+          sub.unsubscribe();
+        }
+      };
+    });
+  }
+  request(op) {
+    return this.requester(op);
+  }
+};
+var HttpLink = class _HttpLink {
+  httpClient;
+  constructor(httpClient) {
+    this.httpClient = httpClient;
+  }
+  create(options) {
+    return new HttpLinkHandler(this.httpClient, options);
+  }
+  static \u0275fac = function HttpLink_Factory(__ngFactoryType__) {
+    return new (__ngFactoryType__ || _HttpLink)(\u0275\u0275inject(HttpClient));
+  };
+  static \u0275prov = /* @__PURE__ */ \u0275\u0275defineInjectable({
+    token: _HttpLink,
+    factory: _HttpLink.\u0275fac,
+    providedIn: "root"
+  });
+};
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpLink, [{
+    type: Injectable,
+    args: [{
+      providedIn: "root"
+    }]
+  }], () => [{
+    type: HttpClient
+  }], null);
+})();
+
+// src/app/app.config.ts
+var appConfig = {
+  providers: [provideZoneChangeDetection({ eventCoalescing: true }), provideHttpClient(), provideRouter(routes), provideAuth0({
+    domain: environment.auth0_domain,
+    clientId: environment.auth0_client_id,
+    authorizationParams: {
+      redirect_uri: window.location.origin
+    }
+  }), provideQuillConfig({ modules: { syntax: true } }), provideHttpClient(), provideApollo(() => {
+    const httpLink = inject(HttpLink);
+    return {
+      link: httpLink.create({
+        uri: "http://localhost:8000/graphql"
+      }),
+      cache: new InMemoryCache()
+    };
+  }), {
+    provide: APOLLO_NAMED_OPTIONS,
+    useFactory(httpLink) {
+      return {
+        rbac: {
+          cache: new InMemoryCache(),
+          link: httpLink.create({ uri: `${environment.url_rbac}/nt-rbac/api` })
+        },
+        administracion: {
+          cache: new InMemoryCache(),
+          link: httpLink.create({ uri: `${environment.url_administracion}/facto/administracion/api/v1/graphql` })
+        }
+      };
+    },
+    deps: [HttpLink]
+  }]
+};
+
+// src/app/app.component.ts
+var AppComponent = class _AppComponent {
+  title = "emision-hyatt-nt-group-hospitality-front";
+  static \u0275fac = function AppComponent_Factory(__ngFactoryType__) {
+    return new (__ngFactoryType__ || _AppComponent)();
+  };
+  static \u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _AppComponent, selectors: [["app-root"]], decls: 1, vars: 0, template: function AppComponent_Template(rf, ctx) {
+    if (rf & 1) {
+      \u0275\u0275element(0, "router-outlet");
+    }
+  }, dependencies: [RouterOutlet], encapsulation: 2 });
+};
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(AppComponent, [{
+    type: Component,
+    args: [{ selector: "app-root", standalone: true, imports: [RouterOutlet], template: "<router-outlet />" }]
+  }], null, null);
+})();
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AppComponent, { className: "AppComponent", filePath: "app/app.component.ts", lineNumber: 11 });
+})();
+
+// src/main.ts
+bootstrapApplication(AppComponent, appConfig).catch((err) => console.error(err));
+//# sourceMappingURL=main.js.map

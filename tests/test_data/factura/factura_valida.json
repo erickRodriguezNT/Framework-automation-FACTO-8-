@@ -1,0 +1,25 @@
+{
+  "_comentario": "Datos de prueba para el flujo de Factura (CFDI tipo I - Ingreso). Actualizar con datos reales del portal.",
+  "rfc_receptor": "XAXX010101000",
+  "nombre_receptor": "CLIENTE GENERICO SA DE CV",
+  "uso_cfdi": "G03",
+  "forma_pago": "03",
+  "metodo_pago": "PUE",
+  "serie": "A",
+  "folio": "1001",
+  "conceptos": [
+    {
+      "clave_prod_serv": "43232404",
+      "descripcion": "Servicio de desarrollo de software",
+      "cantidad": 1,
+      "clave_unidad": "E48",
+      "precio_unitario": 10000.00,
+      "objeto_imp": "02"
+    }
+  ],
+  "impuestos": {
+    "tipo": "IVA",
+    "tasa": "0.160000",
+    "tipo_factor": "Tasa"
+  }
+}

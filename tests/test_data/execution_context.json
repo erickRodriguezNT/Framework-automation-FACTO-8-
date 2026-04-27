@@ -1,0 +1,41 @@
+{
+  "_comentario": "Plantilla de ejemplo de un ExecutionContext serializado. Útil para tests de replay y documentación.",
+  "execution_id": "ej-00000000-0000-0000-0000-000000000000",
+  "flujo": "factura",
+  "estado": "exitoso",
+  "inicio": "2025-07-01T10:00:00.000000",
+  "fin": "2025-07-01T10:05:30.000000",
+  "duracion_segundos": 330.0,
+  "datos_dinamicos": {
+    "uuid_cfdi": "TODO-UUID",
+    "uuid_factura_relacionada": "",
+    "uuid_cfdi_ppd": "",
+    "uuid_complemento_pago": "",
+    "uuid_adenda": ""
+  },
+  "archivos_generados": {
+    "xml": "outputs/xml/factura_A_1001.xml",
+    "pdf": "outputs/pdf/factura_A_1001.pdf",
+    "reporte_pdf": "outputs/pdf/reporte_ej-00000000.pdf",
+    "reporte_json": "outputs/json/reporte_ej-00000000.json",
+    "zip": "outputs/zip/evidencia_ej-00000000.zip"
+  },
+  "pasos_ejecutados": [
+    {
+      "nombre": "login",
+      "estado": "exitoso",
+      "inicio": "2025-07-01T10:00:00",
+      "fin": "2025-07-01T10:00:05",
+      "duracion_ms": 5000,
+      "error": null
+    },
+    {
+      "nombre": "navegacion_factura",
+      "estado": "exitoso",
+      "inicio": "2025-07-01T10:00:05",
+      "fin": "2025-07-01T10:00:08",
+      "duracion_ms": 3000,
+      "error": null
+    }
+  ]
+}

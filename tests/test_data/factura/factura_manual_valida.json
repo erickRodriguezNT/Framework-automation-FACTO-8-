@@ -1,0 +1,50 @@
+{
+  "emisor": {
+    "centro_consumo": "VALOR_EJEMPLO",
+    "serie": "VALOR_EJEMPLO"
+  },
+  "receptor": {
+    "rfc": "XAXX010101000",
+    "razon_social": "PUBLICO EN GENERAL",
+    "codigo_postal": "00000",
+    "regimen_fiscal": "616",
+    "uso_cfdi": "S01",
+    "email": "cliente@ejemplo.com"
+  },
+  "comprobante": {
+    "fecha_emision": "AUTO",
+    "exportacion": "01",
+    "moneda": "MXN",
+    "tipo_cambio": "1",
+    "metodo_pago": "PUE",
+    "forma_pago": "01",
+    "condiciones_pago": "Contado",
+    "observaciones": "Factura generada por automatización",
+    "idioma": "ES",
+    "referencia": "AUTO-FACTURA-001"
+  },
+  "conceptos": [
+    {
+      "descripcion": "SERVICIO DE HOSPEDAJE",
+      "cantidad": "1",
+      "unidad": "E48",
+      "clave_producto_servicio": "90111501",
+      "valor_unitario": "1000.00",
+      "descuento": "0.00",
+      "objeto_impuesto": "02",
+      "impuestos": [
+        {
+          "tipo": "traslado",
+          "impuesto": "002",
+          "tipo_factor": "Tasa",
+          "tasa_o_cuota": "0.160000"
+        }
+      ]
+    }
+  ],
+  "validaciones": {
+    "espera_uuid": true,
+    "descargar_pdf": true,
+    "descargar_xml": true
+  }
+}

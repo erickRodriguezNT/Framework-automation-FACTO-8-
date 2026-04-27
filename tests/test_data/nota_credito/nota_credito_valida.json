@@ -1,0 +1,12 @@
+{
+  "_comentario": "Datos de prueba para el flujo de Nota de Crédito (CFDI tipo E - Egreso). Actualizar con UUID real.",
+  "uuid_factura_relacionada": "TODO-REEMPLAZAR-UUID-FACTURA-REAL",
+  "tipo_relacion": "01",
+  "rfc_receptor": "XAXX010101000",
+  "nombre_receptor": "CLIENTE GENERICO SA DE CV",
+  "uso_cfdi": "G01",
+  "motivo": "Descuento por volumen",
+  "importe": 1000.00,
+  "moneda": "MXN",
+  "tipo_cambio": 1.0
+}
