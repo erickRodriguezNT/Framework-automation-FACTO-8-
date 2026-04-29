@@ -1,102 +1,304 @@
-"""
-nota_credito_flow.py - Flujo principal de emisión de Nota de Crédito.
+﻿"""
+nota_credito_flow.py - Flujo principal de Nota de Credito (CFDI tipo E - Egreso) en FACTO 8.
 
-Una Nota de Crédito (CFDI tipo E - Egreso) se emite para:
-- Descuentos sobre una factura ya timbrada
-- Devoluciones de mercancía
-- Bonificaciones
-
-DEPENDENCIA: Requiere UUID de una Factura (tipo I - Ingreso) previamente
-             timbrada para establecer la relación CFDI.
+Etapa 1: Valida que el modulo de NC corre correctamente replicando el mismo
+flujo de Factura Manual.
 
 Uso:
     from app.flows.nota_credito.nota_credito_flow import NotaCreditoFlow
     flow = NotaCreditoFlow(driver, execution_context)
-    result = flow.run(test_data={...}, uuid_factura_relacionada="xxx-yyy-zzz")
+    result = flow.run(test_data={...})
 """
+import time
+
 from app.core.base_flow import BaseFlow
+from app.flows.common.login_flow import LoginFlow
 from app.flows.common.navigation_flow import NavigationFlow
-from app.pages.common.loader_page import LoaderPage
+from app.flows.nota_credito.nota_credito_descarga_flow import NotaCreditoDescargaFlow
+from app.flows.nota_credito.nota_credito_timbrado_flow import NotaCreditoTimbradoFlow
+from app.pages.nota_credito.nota_credito_cargos_no_facturables_page import NotaCreditoCargosNoFacturablesPage
+from app.pages.nota_credito.nota_credito_comprobante_page import NotaCreditoComprobantePage
+from app.pages.nota_credito.nota_credito_configuracion_page import NotaCreditoConfiguracionPage
+from app.pages.nota_credito.nota_credito_conceptos_page import NotaCreditoConceptosPage
+from app.pages.nota_credito.nota_credito_emisor_page import NotaCreditoEmisorPage
+from app.pages.nota_credito.nota_credito_impuestos_page import NotaCreditoImpuestosPage
 from app.pages.nota_credito.nota_credito_page import NotaCreditoPage
-from app.pages.nota_credito.nota_credito_resultado_page import NotaCreditoResultadoPage
+from app.pages.nota_credito.nota_credito_receptor_page import NotaCreditoReceptorPage
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class NotaCreditoFlow(BaseFlow):
-    """
-    Flujo de emisión de Nota de Crédito (CFDI tipo E - Egreso).
-
-    Requiere el UUID de la factura relacionada como dato previo.
-    """
+    """Flujo base de Nota de Credito - Etapa 1."""
 
     def run(self, **kwargs) -> dict:
-        """
-        Ejecuta el flujo completo de emisión de Nota de Crédito.
+        return self.ejecutar_nota_credito_base(kwargs.get("test_data", {}))
 
-        Args:
-            test_data:               (dict) Datos de la nota de crédito.
-            uuid_factura_relacionada:(str)  UUID del CFDI de ingreso relacionado.
+    def ejecutar_nota_credito_base(self, test_data: dict) -> dict:
+        from pathlib import Path
 
-        Returns:
-            Resultado con UUID de la Nota de Crédito o error.
-        """
+        es_plano = "rfc_receptor" in test_data or "caso_id" in test_data
+        caso_id  = str(test_data.get("caso_id", "NC_RUN")).strip()
+
+        if es_plano:
+            emisor_data = {"centro_consumo": test_data.get("centro_consumo", ""),
+                           "serie":          test_data.get("serie", "")}
+        else:
+            emisor_data = test_data.get("emisor", {})
+
+        uuid_relacionado = str(test_data.get("uuid_relacionado", "")).strip()
+        tipo_relacion    = str(test_data.get("tipo_relacion", "")).strip()
+        uuids_seleccionados = str(test_data.get("uuids_seleccionados", "")).strip()
+        if uuid_relacionado:
+            logger.info(f"[NC FLOW] [{caso_id}] UUID relacionado: {uuid_relacionado}")
+        if tipo_relacion:
+            logger.info(f"[NC FLOW] [{caso_id}] Tipo relacion: {tipo_relacion}")
+
+        evidence_dir = Path("outputs") / "nota_credito" / caso_id / "screenshots"
+        try:
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            self.context.set_dato("evidence_dir_nc", str(evidence_dir))
+        except Exception as exc:
+            logger.warning(f"[NC FLOW] No se pudo crear evidence_dir: {exc}")
+
         self._registrar_inicio()
-        test_data: dict = kwargs.get("test_data", {})
-        uuid_factura = (
-            kwargs.get("uuid_factura_relacionada")
-            or self.context.get_dato("uuid_factura_relacionada")
-            or self.context.get_dato("uuid_cfdi", "")
-        )
-
-        if not uuid_factura:
-            return self._marcar_fallido(
-                "Se requiere uuid_factura_relacionada para emitir una Nota de Crédito."
-            )
 
         try:
-            # --- Paso 1: Navegar al módulo de Nota de Crédito ---
-            nav_flow = NavigationFlow(self.driver, self.context)
-            nav_result = nav_flow.run(destino="nota_credito")
-            if nav_result["estado"] == "fallido":
-                return self._marcar_fallido(f"Navegación falló: {nav_result['error']}")
-            self._registrar_paso("navegar_nota_credito", "exitoso")
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 0: Login.")
+            self._login_portal()
 
-            # --- Paso 2: Llenar formulario ---
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 1: Navegar.")
+            self._navegar_portal()
+
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 2: Verificar pantalla.")
             nc_page = NotaCreditoPage(self.driver)
-            loader_page = LoaderPage(self.driver)
+            nc_page.wait_for_pantalla_nota_credito()
+            self._registrar_paso("pantalla_nc_cargada", "exitoso")
+            nc_page.tomar_evidencia_pantalla(caso_id, "01_pantalla_nc_cargada")
 
-            # TODO: Implementar con selectores reales del portal
-            # nc_page.fill_uuid_relacionado(uuid_factura)
-            # nc_page.select_tipo_relacion(test_data.get("tipo_relacion", "01"))
-            # nc_page.fill_rfc_receptor(test_data.get("rfc_receptor", ""))
-            # nc_page.fill_nombre_receptor(test_data.get("nombre_receptor", ""))
-            # nc_page.select_uso_cfdi(test_data.get("uso_cfdi", ""))
-            # nc_page.fill_motivo(test_data.get("motivo", ""))
-            # nc_page.fill_importe(str(test_data.get("importe", "")))
-            # nc_page.click_continuar()
-            # loader_page.wait_for_loader_to_disappear()
+            # ----------------------------------------------------------
+            # PASO 2b: Personalizar — habilitar CFDI Relacionado ANTES
+            # de llenar el formulario para evitar que el drawer resetee
+            # los campos ya llenados (centro de consumo, receptor, etc.).
+            # ----------------------------------------------------------
+            if tipo_relacion or uuid_relacionado:
+                logger.info(f"[NC FLOW] [{caso_id}] Paso 2b: Activar toggle CFDI Relacionado (drawer — antes de llenar formulario).")
+                config_page = NotaCreditoConfiguracionPage(self.driver)
+                config_page.configurar_cfdi_relacionado()
+                self._registrar_paso("configurar_cfdi_relacionado", "exitoso")
+                nc_page.tomar_evidencia_pantalla(caso_id, "01b_cfdi_relacionado_toggle_activado")
 
-            self._registrar_paso("llenar_formulario_nota_credito", "omitido", "TODO: implementar")
-            self._tomar_screenshot("02_formulario_nota_credito")
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 3: Emisor.")
+            emisor_page = NotaCreditoEmisorPage(self.driver)
+            centro_consumo = emisor_data.get("centro_consumo", "")
+            serie = emisor_data.get("serie", "")
+            if centro_consumo:
+                emisor_page.select_centro_consumo(centro_consumo)
+            if serie:
+                emisor_page.select_serie(serie)
+            # Leer DOM para confirmar qué quedó seleccionado realmente
+            centro_dom = emisor_page.leer_centro_consumo_seleccionado()
+            logger.info(
+                f"[NC FLOW] [{caso_id}] EMISOR DIAGNÓSTICO\n"
+                f"  Excel centro_consumo : {centro_consumo!r}\n"
+                f"  DOM  centro_consumo  : {centro_dom!r}"
+            )
+            self._registrar_paso("capturar_emisor", "exitoso",
+                                 f"centro_consumo={centro_consumo!r}, serie={serie!r}")
+            nc_page.tomar_evidencia_pantalla(caso_id, "02_emisor_capturado")
 
-            # --- Paso 3: Capturar resultado ---
-            resultado_page = NotaCreditoResultadoPage(self.driver)
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 4: Receptor.")
+            receptor_page = NotaCreditoReceptorPage(self.driver)
+            rfc = str(test_data.get("rfc_receptor", "")).strip()
+            if rfc:
+                receptor_page.capturar_rfc_receptor(rfc)
+                receptor_page.click_buscar_rfc()
+            receptor_page.capturar_razon_social(str(test_data.get("razon_social", "")).strip())
+            receptor_page.capturar_codigo_postal(str(test_data.get("codigo_postal", "")).strip())
+            receptor_page.seleccionar_regimen_fiscal_receptor(
+                str(test_data.get("regimen_fiscal_receptor", "")).strip())
+            receptor_page.seleccionar_uso_cfdi(str(test_data.get("uso_cfdi", "")).strip())
+            receptor_page.capturar_email(str(test_data.get("email", "")).strip())
+            if receptor_page.activar_domicilio_fiscal_si_aplica(test_data):
+                receptor_page.capturar_domicilio_fiscal(test_data)
+            self._registrar_paso("capturar_receptor", "exitoso", f"rfc={rfc!r}")
+            nc_page.tomar_evidencia_pantalla(caso_id, "03_receptor_capturado")
 
-            # TODO: Verificar timbrado y capturar UUID
-            # if not resultado_page.is_timbrado_exitoso():
-            #     return self._marcar_fallido(resultado_page.get_error_message())
-            # uuid_nc = resultado_page.get_uuid_cfdi()
-            # self._guardar_resultado("uuid_cfdi_nc", uuid_nc)
-            # self.context.set_dato("uuid_nota_credito", uuid_nc)
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 5: Comprobante.")
+            comprobante_page = NotaCreditoComprobantePage(self.driver)
+            comprobante_page.fill_comprobante_desde_caso(test_data)
+            self._registrar_paso("capturar_comprobante", "exitoso")
+            nc_page.tomar_evidencia_pantalla(caso_id, "04_comprobante_capturado")
 
-            self._registrar_paso("obtener_uuid_nota_credito", "omitido", "TODO: implementar")
-            self._tomar_screenshot("03_resultado_nota_credito")
+            # ----------------------------------------------------------
+            # PASO 6: Personalizar — habilitar CFDI Relacionado
+            # Solo se ejecuta si NO se activó ya en el Paso 2b
+            # (cuando no hay tipo_relacion ni uuid_relacionado).
+            # ----------------------------------------------------------
+            if not (tipo_relacion or uuid_relacionado):
+                logger.info(f"[NC FLOW] [{caso_id}] Paso 6: Configurar CFDI Relacionado (drawer).")
+                config_page = NotaCreditoConfiguracionPage(self.driver)
+                config_page.configurar_cfdi_relacionado()
+                self._registrar_paso("configurar_cfdi_relacionado", "exitoso")
+                nc_page.tomar_evidencia_pantalla(caso_id, "05_cfdi_relacionado_toggle_activado")
 
+            # ----------------------------------------------------------
+            # PASO 6b: Llenar formulario CFDI Relacionado (página principal)
+            # ----------------------------------------------------------
+            if tipo_relacion or uuid_relacionado:
+                logger.info(f"[NC FLOW] [{caso_id}] Paso 6b: Llenar CFDI Relacionado.")
+                cfdi_page = NotaCreditoConfiguracionPage(self.driver)
+                cfdi_page.fill_cfdi_relacionado(tipo_relacion, uuid_relacionado)
+                self._registrar_paso("fill_cfdi_relacionado", "exitoso",
+                                     f"tipo={tipo_relacion!r}, uuid={uuid_relacionado!r}")
+                nc_page.tomar_evidencia_pantalla(caso_id, "06_cfdi_relacionado_llenado")
+            else:
+                logger.info(f"[NC FLOW] [{caso_id}] Paso 6b: Sin UUID relacionado — omitido.")
+
+            if test_data.get("cargo_no_facturable_nombre"):
+                logger.info(f"[NC FLOW] [{caso_id}] Paso 7a: Cargos no facturables.")
+                cargos_page = NotaCreditoCargosNoFacturablesPage(self.driver)
+                cargos_page.agregar_cargo_desde_caso(test_data)
+                nc_page.tomar_evidencia_pantalla(caso_id, "07a_cargo_no_facturable")
+
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 7: Conceptos y Servicios.")
+            conceptos_page = NotaCreditoConceptosPage(self.driver)
+            conceptos_page.agregar_concepto_desde_caso(test_data)
+
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 7.5: Validar concepto guardado.")
+            cantidad_conceptos = conceptos_page.get_cantidad_conceptos()
+            if cantidad_conceptos == 0:
+                raise AssertionError(
+                    "[PRE-TIMBRADO NC] No se encontro ningun concepto en la tabla."
+                )
+            logger.info(f"[NC FLOW] [{caso_id}] Concepto(s) en tabla: {cantidad_conceptos}")
+            self._registrar_paso("validar_concepto_guardado", "exitoso",
+                                 f"conceptos en tabla: {cantidad_conceptos}")
+
+            nc_page.scroll_to_bottom()
+            impuestos_page = NotaCreditoImpuestosPage(self.driver)
+            totales_imp = impuestos_page.registrar_totales_impuestos()
+            self._registrar_paso("validar_impuestos_pre_timbrado", "exitoso", str(totales_imp))
+            nc_page.scroll_to_top()
+
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 8: Totales.")
+            totales = nc_page.validar_totales()
+            self._guardar_resultado("totales_pre_timbrado", totales)
+            self._registrar_paso("validar_totales", "exitoso", str(totales))
+            nc_page.tomar_evidencia_pantalla(caso_id, "08_totales_validados")
+
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 9: Timbrar.")
+            resultado_timbrado = self._timbrar()
+            if resultado_timbrado["estado"] == "fallido":
+                nc_page.tomar_evidencia_pantalla(caso_id, "error_timbrado")
+                time.sleep(10)
+                return self._marcar_fallido(f"Timbrado fallo: {resultado_timbrado.get('error')}")
+            nc_page.tomar_evidencia_pantalla(caso_id, "09_timbrado_completado")
+
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 10: Validar resultado.")
+            self._validar_resultado()
+
+            descargar_pdf = test_data.get("descargar_pdf", False)
+            descargar_xml = test_data.get("descargar_xml", False)
+            if descargar_pdf or descargar_xml:
+                logger.info(f"[NC FLOW] [{caso_id}] Paso 11: Descargar documentos.")
+                tipos = []
+                if descargar_pdf:
+                    tipos.append("pdf")
+                if descargar_xml:
+                    tipos.append("xml")
+                descarga_flow = NotaCreditoDescargaFlow(self.driver, self.context)
+                descarga_flow.run(tipos=tipos)
+                nc_page.tomar_evidencia_pantalla(caso_id, "10_descarga_completada")
+
+            logger.info(f"[NC FLOW] [{caso_id}] Flujo completado exitosamente.")
+            self._generar_reporte(caso_id, test_data, "exitoso")
             return self._marcar_exitoso()
 
         except Exception as exc:
-            logger.exception(f"Error en NotaCreditoFlow: {exc}")
-            self._tomar_screenshot("error_nota_credito")
+            logger.exception(f"[NC FLOW] [{caso_id}] Error: {exc}")
+            try:
+                NotaCreditoPage(self.driver).tomar_evidencia_pantalla(caso_id, "error_nc_flow")
+            except Exception:
+                pass
+            self._generar_reporte(caso_id, test_data, "fallido", str(exc))
+            time.sleep(10)
             return self._marcar_fallido(str(exc))
+
+    def _login_portal(self) -> None:
+        login_flow = LoginFlow(self.driver, self.context)
+        result = login_flow.run(
+            username=self._obtener_dato("username"),
+            password=self._obtener_dato("password"),
+            base_url=self._obtener_dato("base_url"),
+        )
+        if result["estado"] == "fallido":
+            raise RuntimeError(f"Login fallo: {result.get('error')}")
+        self._registrar_paso("login_portal", "exitoso")
+
+    def _navegar_portal(self) -> None:
+        nav_flow = NavigationFlow(self.driver, self.context)
+        result = nav_flow.run(destino="nota_credito")
+        if result["estado"] == "fallido":
+            raise RuntimeError(f"Navegacion a nota_credito fallo: {result.get('error')}")
+        self._registrar_paso("navegar_portal_nc", "exitoso")
+
+    def _timbrar(self) -> dict:
+        nc_page = NotaCreditoPage(self.driver)
+        nc_page.click_timbrar()
+        timbrado_flow = NotaCreditoTimbradoFlow(self.driver, self.context)
+        return timbrado_flow.run()
+
+    def _validar_resultado(self) -> None:
+        from app.pages.nota_credito.nota_credito_resultado_page import NotaCreditoResultadoPage
+        resultado_page = NotaCreditoResultadoPage(self.driver)
+        uuid_nc = resultado_page.get_uuid_cfdi()
+        if uuid_nc:
+            self.context.set_dato("uuid_nota_credito", uuid_nc)
+            self._guardar_resultado("uuid_nota_credito", uuid_nc)
+            logger.info(f"[NC FLOW] UUID Nota de Credito: {uuid_nc}")
+        self._registrar_paso("validar_resultado_nc", "exitoso", f"uuid_nota_credito={uuid_nc!r}")
+
+    def _generar_reporte(self, caso_id: str, test_data: dict, estado: str, error: str = "") -> None:
+        """Genera reporte JSON con los campos del Excel y el estado final del caso."""
+        import json
+        from datetime import datetime
+        from pathlib import Path
+
+        campos_reporte = [
+            "ejecutar", "caso_id", "descripcion",
+            "centro_consumo", "serie",
+            "rfc_receptor", "razon_social", "codigo_postal",
+            "regimen_fiscal_receptor", "uso_cfdi", "email",
+            "calle", "num_exterior", "num_interior", "colonia", "municipio", "estado",
+            "fecha_emision", "exportacion", "moneda", "tipo_cambio",
+            "metodo_pago", "forma_pago", "condiciones_pago",
+            "observaciones_pdf", "idioma", "integraciones", "referencia",
+            "clave_unidad", "cantidad", "no_identificacion",
+            "clave_prod_serv", "descripcion_concepto",
+            "valor_unitario", "descuento",
+            "objeto_impuesto", "impuesto", "ret_tras", "tipo_factor", "tasa_o_cuota",
+            "cargo_no_facturable_nombre", "cargo_no_facturable_importe",
+            "descargar_pdf", "descargar_xml",
+            "tipo_relacion", "uuids_seleccionados", "uuid_relacionado",
+            "resultado_esperado",
+        ]
+
+        reporte = {
+            "caso_id":     caso_id,
+            "timestamp":   datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "estado":      estado,
+            "error":       error,
+            "datos_excel": {campo: str(test_data.get(campo, "")) for campo in campos_reporte},
+        }
+
+        try:
+            output_dir = Path("outputs") / "nota_credito" / caso_id
+            output_dir.mkdir(parents=True, exist_ok=True)
+            ruta = output_dir / f"reporte_{caso_id}.json"
+            with open(ruta, "w", encoding="utf-8") as f:
+                json.dump(reporte, f, ensure_ascii=False, indent=2)
+            logger.info(f"[NC FLOW] Reporte guardado: {ruta}")
+        except Exception as exc_rep:
+            logger.warning(f"[NC FLOW] No se pudo guardar el reporte: {exc_rep}")

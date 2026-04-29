@@ -17,8 +17,11 @@ def main() -> int:
 
     cmd = [
         sys.executable, "-m", "pytest",
-        "tests/features/nota_credito.feature",
-        "--tb=short", "-v",
+        "tests/step_definitions/nota_credito_steps.py",
+        "-m", "nota_credito",
+        "--tb=short",
+        "-v",
+        "-s",
         "--alluredir=allure-results",
     ]
     if headless:

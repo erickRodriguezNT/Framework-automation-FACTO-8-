@@ -10,7 +10,7 @@ from pytest_bdd import given, scenarios, then, when
 from app.flows.nota_credito.nota_credito_flow import NotaCreditoFlow
 from app.services.data_service import DataService
 
-scenarios("nota_credito.feature")
+# scenarios("nota_credito.feature")  # Movido a nota_credito_steps.py
 
 
 @given("existe una factura previamente timbrada con UUID válido en el sistema")
