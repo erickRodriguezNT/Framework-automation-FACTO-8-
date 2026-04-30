@@ -142,7 +142,7 @@ class FacturaImpuestosPage(BasePage):
             Texto del total de traslados (ej: '$160.00'), o '' si no aplica.
         """
         try:
-            valor = self.get_text(self.TOTAL_TRASLADOS)
+            valor = self.get_text(self.TOTAL_TRASLADOS, timeout=2)
             logger.debug(f"[IMPUESTOS] Total traslados: {valor}")
             return valor
         except Exception:
@@ -162,7 +162,7 @@ class FacturaImpuestosPage(BasePage):
             Texto del total de retenciones, o '' si no aplica.
         """
         try:
-            valor = self.get_text(self.TOTAL_RETENCIONES)
+            valor = self.get_text(self.TOTAL_RETENCIONES, timeout=2)
             logger.debug(f"[IMPUESTOS] Total retenciones: {valor}")
             return valor
         except Exception:

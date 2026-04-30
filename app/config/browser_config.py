@@ -51,7 +51,11 @@ CHROME_ARGUMENTS_LOCAL = [
 CHROME_DOWNLOAD_PREFERENCES = {
     "download.prompt_for_download": False,
     "download.directory_upgrade": True,
-    "plugins.always_open_pdf_externally": True,  # PDF → descarga directa
+    # False  → Chrome puede renderizar PDFs con su visor interno (necesario para
+    #          que el visor Angular del portal muestre el preview correctamente).
+    # Las descargas reales se controlan vía CDP Page.setDownloadBehavior(allow),
+    # que toma precedencia sobre esta preferencia en tiempo de ejecución.
+    "plugins.always_open_pdf_externally": False,
     "safebrowsing.enabled": True,
 }
 

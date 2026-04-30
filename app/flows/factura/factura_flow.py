@@ -32,6 +32,7 @@ from app.pages.factura.factura_impuestos_page import FacturaImpuestosPage
 from app.pages.factura.factura_page import FacturaPage
 from app.pages.factura.factura_receptor_page import FacturaReceptorPage
 from app.utils.logger import get_logger
+from app.utils.output_manager import create_case_output_dir, get_screenshot_dir
 
 logger = get_logger(__name__)
 
@@ -111,14 +112,24 @@ class FacturaFlow(BaseFlow):
             conceptos        = test_data.get("conceptos", [])
             validaciones     = test_data.get("validaciones", {})
 
-        # --- Crear directorio de evidencias por caso_id ---
-        evidence_dir = Path("outputs") / "factura" / caso_id / "screenshots"
-        try:
-            evidence_dir.mkdir(parents=True, exist_ok=True)
-            self.context.set_dato("evidence_dir", str(evidence_dir))
-            logger.info(f"[FACTURA FLOW] Directorio de evidencias: {evidence_dir}")
-        except Exception as exc:
-            logger.warning(f"[FACTURA FLOW] No se pudo crear evidence_dir: {exc}")
+        # --- Crear directorio de caso dentro del run_dir de esta corrida ---
+        run_dir_str = self.context.get_dato("run_dir_factura")
+        if run_dir_str:
+            run_dir = Path(run_dir_str)
+        else:
+            # Retrocompatibilidad: si el step no creó run_dir, usar ruta sin timestamp
+            from app.utils.output_manager import _PROJECT_ROOT
+            run_dir = _PROJECT_ROOT / "outputs" / "factura"
+            run_dir.mkdir(parents=True, exist_ok=True)
+
+        row_index = self.context.get_dato("factura_row_index", 0)
+        case_dir = create_case_output_dir(run_dir, caso_id, row_index=row_index)
+        screenshot_dir = get_screenshot_dir(case_dir)
+
+        # Registrar en contexto para uso en CfdiDescargaFlow
+        self.context.set_dato("evidence_dir", str(screenshot_dir))
+        self.context.set_dato("case_dir_factura", str(case_dir))
+        logger.info(f"[FACTURA FLOW] [{caso_id}] Case dir: {case_dir}")
 
         self._registrar_inicio()
 
@@ -140,6 +151,8 @@ class FacturaFlow(BaseFlow):
             # ----------------------------------------------------------
             logger.info(f"[FACTURA FLOW] [{caso_id}] Paso 2: Verificar pantalla.")
             factura_page = FacturaPage(self.driver)
+            # Inyectar ruta de screenshots con timestamp para esta corrida
+            factura_page._screenshot_dir = screenshot_dir
             factura_page.wait_for_pantalla_factura()
             self._registrar_paso("pantalla_factura_cargada", "exitoso")
             factura_page.tomar_evidencia_pantalla(caso_id, "01_pantalla_factura_cargada")
@@ -250,12 +263,11 @@ class FacturaFlow(BaseFlow):
             self.validar_resultado()
 
             # ----------------------------------------------------------
-            # PASO 11: Descargar documentos (condicional)
+            # PASO 11: Descargar PDF y XML del visor de timbrado
             # ----------------------------------------------------------
-            if validaciones.get("descargar_pdf") or validaciones.get("descargar_xml"):
-                logger.info(f"[FACTURA FLOW] [{caso_id}] Paso 11: Descargar documentos.")
-                self.descargar_documentos(validaciones)
-                factura_page.tomar_evidencia_pantalla(caso_id, "08_descarga_completada")
+            logger.info(f"[FACTURA FLOW] [{caso_id}] Paso 11: Descargar documentos.")
+            self.descargar_documentos({"descargar_pdf": True, "descargar_xml": True})
+            factura_page.tomar_evidencia_pantalla(caso_id, "08_descarga_completada")
 
             logger.info(f"[FACTURA FLOW] [{caso_id}] Flujo completado exitosamente.")
             return self._marcar_exitoso()
@@ -263,7 +275,9 @@ class FacturaFlow(BaseFlow):
         except Exception as exc:
             logger.exception(f"[FACTURA FLOW] [{caso_id}] Error: {exc}")
             try:
-                FacturaPage(self.driver).tomar_evidencia_pantalla(caso_id, "error_factura_flow")
+                err_page = FacturaPage(self.driver)
+                err_page._screenshot_dir = screenshot_dir
+                err_page.tomar_evidencia_pantalla(caso_id, "error_factura_flow")
             except Exception:
                 pass
             return self._marcar_fallido(str(exc))
@@ -372,9 +386,30 @@ class FacturaFlow(BaseFlow):
         if not rfc:
             logger.warning("[FACTURA FLOW] rfc_receptor vacío en el caso.")
 
+        razon_social_excel = str(caso.get("razon_social", "")).strip()
+
         receptor_page.capturar_rfc_receptor(rfc)
         receptor_page.click_buscar_rfc()
-        receptor_page.capturar_razon_social(str(caso.get("razon_social", "")).strip())
+
+        # Esperar a que el portal auto-rellene Razón Social desde su API (async)
+        # antes de sobrescribir con el valor del Excel.
+        import time as _time
+        _time.sleep(2)
+
+        receptor_page.capturar_razon_social(razon_social_excel)
+
+        razon_social_dom = receptor_page.leer_razon_social()
+        logger.info(
+            f"[FACTURA FLOW] RECEPTOR DIAGNÓSTICO\n"
+            f"  Excel razon_social : '{razon_social_excel}'\n"
+            f"  DOM   razon_social : '{razon_social_dom}'"
+        )
+        if razon_social_excel.upper() != razon_social_dom.upper():
+            logger.warning(
+                f"[FACTURA FLOW] razón social DOM ('{razon_social_dom}') "
+                f"difiere del Excel ('{razon_social_excel}')"
+            )
+
         receptor_page.capturar_codigo_postal(str(caso.get("codigo_postal", "")).strip())
         receptor_page.seleccionar_regimen_fiscal_receptor(str(caso.get("regimen_fiscal_receptor", "")).strip())
         receptor_page.seleccionar_uso_cfdi(str(caso.get("uso_cfdi", "")).strip())

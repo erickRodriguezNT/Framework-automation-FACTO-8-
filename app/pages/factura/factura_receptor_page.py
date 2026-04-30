@@ -228,11 +228,31 @@ class FacturaReceptorPage(BasePage):
         """
         Ingresa la Razón Social del Receptor.
 
+        Espera 0.6s para que el portal auto-rellene tras la búsqueda RFC, luego
+        fuerza el valor usando el Native Input Value Setter de Angular si el portal
+        lo sobrescribió.
+
         Args:
             nombre: Nombre o denominación social del receptor (mayúsculas).
         """
-        self.type_text(self.RAZON_SOCIAL, nombre.upper())
-        logger.info(f"[RECEPTOR] Razón social ingresada: {nombre.upper()}")
+        import time as _time
+
+        target = nombre.upper()
+        element = self.wait_for_element(self.RAZON_SOCIAL, condition="visible")
+        element.clear()
+        element.send_keys(target)
+        _time.sleep(0.6)  # dar tiempo al portal para que el RFC lookup sobreescriba (si aplica)
+        actual = (element.get_attribute("value") or "").strip()
+        if actual.upper() != target:
+            logger.debug(f"[RECEPTOR] Razón social sobreescrita por portal ('{actual}'), forzando via JS...")
+            self.driver.execute_script(
+                """const niv = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+                   niv.call(arguments[0], arguments[1]);
+                   arguments[0].dispatchEvent(new Event('input', {bubbles:true}));
+                   arguments[0].dispatchEvent(new Event('change', {bubbles:true}));""",
+                element, target
+            )
+        logger.info(f"[RECEPTOR] Razón social ingresada: {target}")
 
     # ------------------------------------------------------------------
     # Acciones — Código Postal
@@ -245,7 +265,20 @@ class FacturaReceptorPage(BasePage):
         Args:
             cp: Código postal de 5 dígitos (ej: '06600').
         """
-        self.type_text(self.CODIGO_POSTAL, cp)
+        from selenium.webdriver.common.keys import Keys
+        import time as _time
+        element = self.wait_for_element(self.CODIGO_POSTAL, condition="visible")
+        element.clear()
+        element.send_keys(cp)
+        # Angular necesita blur/change para poblar el select de régimen fiscal
+        element.send_keys(Keys.TAB)
+        self.driver.execute_script(
+            "arguments[0].dispatchEvent(new Event('input', {bubbles:true}));"
+            "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));"
+            "arguments[0].dispatchEvent(new Event('blur', {bubbles:true}));",
+            element,
+        )
+        _time.sleep(0.5)
         logger.info(f"[RECEPTOR] Código postal ingresado: {cp}")
 
     # ------------------------------------------------------------------
@@ -398,6 +431,14 @@ class FacturaReceptorPage(BasePage):
     def capturar_razon_social(self, razon_social: str) -> None:
         """Alias de fill_razon_social para compatibilidad con FacturaFlow."""
         self.fill_razon_social(razon_social)
+
+    def leer_razon_social(self) -> str:
+        """Lee el valor actual del campo Razón Social desde el DOM."""
+        try:
+            el = self.driver.find_element(*self.RAZON_SOCIAL)
+            return (el.get_attribute("value") or el.text or "").strip()
+        except Exception:
+            return "(no se pudo leer)"
 
     def capturar_codigo_postal(self, cp: str) -> None:
         """Alias de fill_codigo_postal para compatibilidad con FacturaFlow."""
