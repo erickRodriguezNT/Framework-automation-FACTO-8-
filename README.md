@@ -180,69 +180,38 @@ Si el contexto registra el directorio de evidencias con una clave diferente a `"
 ```
 automation_framework/
 │
-├── app/
-│   ├── core/             # BasePage, BaseFlow, ExecutionContext
-│   ├── config/           # Settings, paths, browser config, entornos
-│   ├── drivers/          # DriverFactory, ChromeOptions
-│   ├── pages/            # Page Objects por módulo
-│   │   ├── common/       # Capa compartida (Login, Home, Menu, Modal,
-│   │   │   │             #   Loader, Download, CfdiEmision, CfdiResultado)
-│   │   │   ├── cfdi_emision_page.py    ← base Conceptos (Factura + NC)
-│   │   │   ├── cfdi_resultado_page.py  ← base Resultado timbrado
-│   │   │   ├── login_page.py
-│   │   │   ├── home_page.py
-│   │   │   ├── menu_page.py
-│   │   │   ├── modal_page.py
-│   │   │   ├── loader_page.py
-│   │   │   └── download_page.py
-│   │   ├── factura/      # Thin subclasses + páginas exclusivas Factura
-│   │   │   ├── factura_conceptos_page.py   ← extiende CfdiEmisionPage
-│   │   │   ├── factura_resultado_page.py   ← extiende CfdiResultadoPage
-│   │   │   ├── factura_page.py
-│   │   │   ├── factura_emisor_page.py
-│   │   │   ├── factura_receptor_page.py
-│   │   │   ├── factura_comprobante_page.py
-│   │   │   ├── factura_impuestos_page.py
-│   │   │   └── factura_cargos_no_facturables_page.py
-│   │   ├── nota_credito/ # Thin subclasses + páginas exclusivas NC
-│   │   │   ├── nota_credito_conceptos_page.py   ← extiende CfdiEmisionPage
-│   │   │   ├── nota_credito_resultado_page.py   ← extiende CfdiResultadoPage
-│   │   │   ├── nota_credito_page.py
-│   │   │   ├── nota_credito_emisor_page.py
-│   │   │   ├── nota_credito_receptor_page.py
-│   │   │   ├── nota_credito_comprobante_page.py
-│   │   │   ├── nota_credito_configuracion_page.py
-│   │   │   ├── nota_credito_impuestos_page.py
-│   │   │   └── nota_credito_cargos_no_facturables_page.py
-│   │   ├── ppd/
-│   │   ├── complemento_pago/
-│   │   └── adenda/
-│   ├── flows/            # Lógica de negocio por módulo
-│   │   ├── common/       # Login, Navigation, Validation
-│   │   │   ├── cfdi_descarga_flow.py  ← base descarga PDF/XML (CDP + visor)
-│   │   │   ├── login_flow.py
-│   │   │   ├── navigation_flow.py
-│   │   │   └── validation_flow.py
+├── app/                      # Código fuente del framework
+│   ├── core/                 # BasePage, BaseFlow, ExecutionContext
+│   ├── config/               # Settings, paths, browser config, entornos
+│   ├── drivers/              # DriverFactory, ChromeOptions
+│   ├── pages/                # Page Objects por módulo
+│   │   ├── common/           # Capa compartida (Login, Home, Menu, Modal,
+│   │   │                       # Loader, Download, CfdiEmision, CfdiResultado)
+│   │   ├── factura/          # Thin subclasses + páginas exclusivas Factura
++│   │   ├── nota_credito/     # Thin subclasses + páginas exclusivas Nota de Crédito
+│   │   ├── ppd/              # Páginas para PPD
+│   │   ├── complemento_pago/  # Páginas para Complemento de Pago
+│   │   └── adenda/           # Páginas para Adenda
+│   ├── flows/                # Lógica de negocio por módulo
+│   │   ├── common/           # Flows reutilizables (login, descargas, navegación)
 │   │   ├── factura/
 │   │   ├── nota_credito/
 │   │   ├── ppd/
 │   │   ├── complemento_pago/
-│   │   ├── adenda/
-│   │   └── orchestrator/ # FlowRegistry, DependencyResolver
-│   ├── services/         # XML, PDF, ZIP, Data, Report services
-│   ├── utils/            # Logger, Waits, Dates, Strings, Retry
-│   ├── evidence/         # Screenshots, EvidenceCollector
-│   └── reporting/        # PDF, XML, JSON, ZIP reports
+│   │   └── adenda/
+│   ├── services/             # XML, PDF, ZIP, Data, Report services
+│   ├── utils/                # Logger, Waits, Dates, Strings, Retry
+│   ├── evidence/             # Screenshots, EvidenceCollector
+│   └── reporting/            # PDF, XML, JSON, ZIP reports
 │
-├── tests/
-│   ├── features/         # Archivos .feature en Gherkin/Español
-│   │   └── regression/   # smoke, end_to_end, dependencias
-│   ├── step_definitions/ # Implementación de steps (solo llaman flows)
-│   ├── hooks/            # Setup/teardown por escenario
-│   ├── runners/          # Scripts de ejecución por flujo/suite
-│   └── test_data/        # JSONs de datos de prueba
+├── tests/                    # Suites de prueba (Gherkin + step implementations)
+│   ├── features/             # Archivos .feature en Gherkin/Español
+│   ├── step_definitions/     # Implementación de steps (solo llaman flows)
+│   ├── hooks/                # Setup/teardown por escenario
+│   ├── runners/              # Scripts de ejecución por flujo/suite
+│   └── test_data/            # JSONs de datos de prueba
 │
-├── outputs/              # Generado en ejecución (ignorado por git)
+├── outputs/                  # Generado en ejecución (ignorado por git)
 │   ├── screenshots/
 │   ├── pdf/
 │   ├── xml/
@@ -250,23 +219,30 @@ automation_framework/
 │   ├── json/
 │   └── zip/
 │
-├── docker/
+├── allure-results/           # Resultados Allure generados por pytest
+├── reports/                  # Reportes y exportaciones (opcional)
+
+├── docker/                   # Recursos para contenedores
 │   ├── Dockerfile
 │   ├── entrypoint.sh
 │   └── cloudrun.env.example
 │
-├── docs/
-│   ├── arquitectura/
-│   ├── flujos/
-│   ├── ejecucion/
-│   └── presentacion/
+├── docs/                     # Documentación adicional y diagramas
 │
+├── inspect_emitir_cfdi.py    # Scripts de inspección / pruebas manuales
+├── inspect_login.py
+├── inspect_menu.py
+├── inspect_receptor.py
+├── EmisionHyattNtGroupHospitalityFront.html
+├── EmisionHyattNtGroupHospitalityFrontfactura.html
+
 ├── requirements.txt
 ├── pytest.ini
 ├── conftest.py
 ├── .env.example
 ├── .gitignore
-└── run.py
+├── run.py
+└── README.md
 ```
 
 ---

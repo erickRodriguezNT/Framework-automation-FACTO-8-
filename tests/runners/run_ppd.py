@@ -1,5 +1,5 @@
 """
-run_ppd.py - Runner de la suite de Factura PPD.
+run_ppd.py - Runner de la suite de CFDI PPD (data-driven desde Excel).
 
     python tests/runners/run_ppd.py
     python tests/runners/run_ppd.py --headless
@@ -17,8 +17,9 @@ def main() -> int:
 
     cmd = [
         sys.executable, "-m", "pytest",
-        "tests/features/ppd.feature",
-        "--tb=short", "-v",
+        "tests/step_definitions/ppd_steps.py",
+        "-m", "ppd",
+        "--tb=short", "-v", "-s",
         "--alluredir=allure-results",
     ]
     if headless:

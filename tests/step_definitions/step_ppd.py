@@ -5,12 +5,13 @@ Implementa los pasos del feature file tests/features/ppd.feature.
 
 REGLA: Los steps SOLO llaman a flows. No usan Selenium directamente.
 """
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, then, when
 
 from app.flows.ppd.ppd_flow import PPDFlow
 from app.services.data_service import DataService
 
-scenarios("ppd.feature")
+# NOTA: scenarios("ppd.feature") fue removido — los steps de ppd.feature
+# ahora están en ppd_steps.py (flujo data-driven desde Excel).
 
 
 @given("que el usuario navega al módulo de Factura PPD")

@@ -323,23 +323,39 @@ class FacturaComprobantePage(BasePage):
 
         _time.sleep(0.5)
 
-        # 3. JS: buscar opción visible por texto exacto / parcial
+        # 3. JS: buscar opción visible por texto exacto / parcial / código
+        # Estrategia en orden de precisión:
+        #   a) Texto completo exacto (leaf)          → "99 - Por definir"
+        #   b) Texto completo case-insensitive (leaf) → "99 - Por Definir"
+        #   c) Código solo case-insensitive (leaf)   → "99"  (opción más común en portales)
+        #   d) Texto completo en cualquier nodo
+        #   e) Código solo en cualquier nodo
         _js_find = """
             const target = arguments[0];
-            const all = document.querySelectorAll('*');
+            const targetUp = target.toUpperCase();
+            const code = target.includes(' - ') ? target.split(' - ')[0].trim() : target;
+            const codeUp = code.toUpperCase();
+            const all = Array.from(document.querySelectorAll('*'));
+
+            // Pase 1: nodos hoja — texto completo o código solo (case-insensitive)
             for (const el of all) {
                 const rect = el.getBoundingClientRect();
                 if (rect.width === 0 || rect.height === 0) continue;
                 if (rect.top < 0 || rect.left < 0) continue;
+                if (el.children.length !== 0) continue;
                 const t = (el.textContent || '').trim();
-                if (t === target && el.children.length === 0) return el;
+                if (t === target) return el;
+                if (t.toUpperCase() === targetUp) return el;
+                if (t === code || t.toUpperCase() === codeUp) return el;
             }
+            // Pase 2: cualquier nodo — texto completo, luego código
             for (const el of all) {
                 const rect = el.getBoundingClientRect();
                 if (rect.width === 0 || rect.height === 0) continue;
                 const t = (el.textContent || '').trim();
-                if (t === target) return el;
+                if (t === target || t.toUpperCase() === targetUp) return el;
                 if (t.includes(target) && el.children.length <= 2) return el;
+                if ((t === code || t.toUpperCase() === codeUp) && el.children.length <= 2) return el;
             }
             return null;
         """

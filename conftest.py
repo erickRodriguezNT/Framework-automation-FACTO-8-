@@ -1,3 +1,4 @@
+
 """
 conftest.py - Fixtures globales del framework FACTO 8.
 
