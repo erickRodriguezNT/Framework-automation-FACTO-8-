@@ -157,22 +157,38 @@ class NotaCreditoEmisorPage(BasePage):
             for (const container of containers) {
                 if (!container) continue;
                 const all = container.querySelectorAll('*');
-                // Primer paso: texto exacto normalizado, elemento hoja
+                // Primer paso: texto exacto normalizado, elemento hoja — recopilar todos y devolver el último
+                const exactLeaf = [];
                 for (const el of all) {
                     const rect = el.getBoundingClientRect();
                     if (rect.width === 0 || rect.height === 0) continue;
                     if (rect.top < 0 || rect.left < 0) continue;
                     const t = normalizeText(el.textContent);
-                    if (t === targetNorm && el.children.length === 0) return el;
+                    if (t === targetNorm && el.children.length === 0) exactLeaf.push(el);
                 }
-                // Segundo paso: texto exacto normalizado (con hijos permitidos)
+                if (exactLeaf.length > 0) return exactLeaf[exactLeaf.length - 1];
+                // Segundo paso: exacto normalizado (hijos permitidos) o contains sin prefijos falsos
+                const exactAny = [];
+                const containsAny = [];
                 for (const el of all) {
                     const rect = el.getBoundingClientRect();
                     if (rect.width === 0 || rect.height === 0) continue;
                     const t = normalizeText(el.textContent);
-                    if (t === targetNorm) return el;
-                    if (t.includes(targetNorm) && el.children.length <= 2) return el;
+                    if (t === targetNorm) {
+                        exactAny.push(el);
+                    } else if (el.children.length <= 2) {
+                        const idx = t.indexOf(targetNorm);
+                        if (idx >= 0) {
+                            // Rechazar si lo que sigue al match es texto continuo (prefijo falso)
+                            const after = t.slice(idx + targetNorm.length).trimStart();
+                            if (after === '' || after.startsWith('-') || after.startsWith('(') || after.startsWith('/')) {
+                                containsAny.push(el);
+                            }
+                        }
+                    }
                 }
+                if (exactAny.length > 0) return exactAny[exactAny.length - 1];
+                if (containsAny.length > 0) return containsAny[containsAny.length - 1];
                 if (container !== document.body) continue;
                 break;
             }

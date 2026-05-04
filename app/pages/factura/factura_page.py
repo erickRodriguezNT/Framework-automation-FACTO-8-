@@ -211,7 +211,7 @@ class FacturaPage(BasePage):
             Texto del Gran Total (ej: '$11,600.00'), o vacío si no visible.
         """
         try:
-            return self.get_text(self.GRAN_TOTAL)
+            return self.get_text(self.GRAN_TOTAL, timeout=2)
         except Exception:
             logger.warning("[FACTURA] No se pudo leer el Gran Total.")
             return ""
@@ -219,7 +219,7 @@ class FacturaPage(BasePage):
     def get_subtotal(self) -> str:
         """Retorna el texto del Subtotal (sin impuestos)."""
         try:
-            valor = self.get_text(self.SUBTOTAL_VALOR)
+            valor = self.get_text(self.SUBTOTAL_VALOR, timeout=2)
             logger.debug(f"[FACTURA] Subtotal: {valor}")
             return valor
         except Exception as exc:
@@ -243,7 +243,7 @@ class FacturaPage(BasePage):
             "//span[normalize-space(.)='Descuento']/following-sibling::span[1]",
         )
         try:
-            valor = self.get_text(_DESCUENTO_VALOR)
+            valor = self.get_text(_DESCUENTO_VALOR, timeout=2)
             logger.debug(f"[FACTURA] Descuento: {valor}")
             return valor
         except Exception:
@@ -252,7 +252,7 @@ class FacturaPage(BasePage):
     def get_total(self) -> str:
         """Retorna el texto del Total (antes de la fila Gran Total)."""
         try:
-            valor = self.get_text(self.TOTAL_VALOR)
+            valor = self.get_text(self.TOTAL_VALOR, timeout=2)
             logger.debug(f"[FACTURA] Total: {valor}")
             return valor
         except Exception as exc:
@@ -298,22 +298,28 @@ class FacturaPage(BasePage):
 
     def tomar_evidencia_pantalla(self, caso_id: str, nombre_paso: str) -> str | None:
         """
-        Captura un screenshot y lo guarda en outputs/factura/{caso_id}/screenshots/.
+        Captura un screenshot y lo guarda en el directorio de evidencias del caso.
 
-        La ruta es absoluta (anclada al directorio automation_framework) para que
-        funcione independientemente del directorio de trabajo desde donde se ejecute pytest.
+        Prioridad de ruta:
+        1. ``self._screenshot_dir`` — seteado por el flow cuando usa output_manager
+           (ej: ``outputs/factura/20260429_214530/FACTURA_001/screenshots/``).
+        2. Ruta legacy: ``outputs/factura/{caso_id}/screenshots/`` (retrocompatibilidad).
 
         Args:
-            caso_id:    Identificador del caso (ej: 'FACTURA_001').
+            caso_id:     Identificador del caso (ej: 'FACTURA_001').
             nombre_paso: Nombre descriptivo del paso (ej: 'emisor_completado').
 
         Returns:
             Ruta del screenshot como string, o None si falló.
         """
         from pathlib import Path
-        # parents[3] sube: factura/ -> pages/ -> app/ -> automation_framework/
-        automation_root = Path(__file__).resolve().parents[3]
-        directorio = automation_root / "outputs" / "factura" / caso_id / "screenshots"
+        # Si el flow ya configuró la ruta con run_dir/case_dir, usarla.
+        screenshot_dir = getattr(self, "_screenshot_dir", None)
+        if screenshot_dir is None:
+            # Retrocompatibilidad: ruta sin timestamp
+            automation_root = Path(__file__).resolve().parents[3]
+            screenshot_dir = automation_root / "outputs" / "factura" / caso_id / "screenshots"
+        directorio = Path(screenshot_dir)
         try:
             return str(self.take_screenshot(nombre_paso, directory=directorio))
         except Exception as exc:

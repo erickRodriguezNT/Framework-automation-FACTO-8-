@@ -10,6 +10,7 @@ import logging
 from pytest_bdd import given, scenarios, then, when
 
 from app.flows.nota_credito.nota_credito_flow import NotaCreditoFlow
+from app.utils.output_manager import create_run_output_dir
 from tests.test_data.nota_credito.nota_credito_excel_reader import get_executable_nota_credito_cases
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,11 @@ def casos_cargados(driver, execution_context):
     casos = get_executable_nota_credito_cases()
     assert casos, "No se encontraron casos ejecutables en nota_credito_casos.xlsx"
     execution_context.set_dato("casos_nota_credito", casos)
-    logger.info(f"[NC STEPS] {len(casos)} caso(s) cargado(s) desde Excel.")
+
+    # Crear carpeta de corrida única para TODOS los casos de esta ejecución
+    run_dir = create_run_output_dir("nota_credito")
+    execution_context.set_dato("run_dir_nc", str(run_dir))
+    logger.info(f"[NC STEPS] {len(casos)} caso(s) cargado(s) desde Excel. Run dir: {run_dir}")
 
 
 @when("ejecuto el flujo base de nota de crédito para cada caso marcado como ejecutable")
@@ -53,10 +58,15 @@ def verificar_resultados(execution_context):
 @then("se deben guardar evidencias por caso ejecutado en outputs de nota de crédito")
 def verificar_evidencias(execution_context):
     from pathlib import Path
+    run_dir_str = execution_context.get_dato("run_dir_nc")
     resultados = execution_context.get_dato("resultados_nota_credito") or []
     for r in resultados:
         caso_id = r["caso_id"]
-        evidencia_dir = Path("outputs") / "nota_credito" / caso_id / "screenshots"
+        if run_dir_str:
+            evidencia_dir = Path(run_dir_str) / caso_id / "screenshots"
+        else:
+            from app.utils.output_manager import _PROJECT_ROOT
+            evidencia_dir = _PROJECT_ROOT / "outputs" / "nota_credito" / caso_id / "screenshots"
         if evidencia_dir.exists():
             logger.info(f"[NC STEPS] Evidencias encontradas en: {evidencia_dir}")
         else:

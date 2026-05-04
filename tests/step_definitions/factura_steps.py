@@ -22,6 +22,10 @@ from pytest_bdd import given, scenarios, then, when
 
 from app.flows.factura.factura_flow import FacturaFlow
 from app.services.excel_service import get_executable_factura_cases
+from app.utils.output_manager import create_run_output_dir
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # Vincula todos los escenarios del feature file con este módulo de steps
 scenarios("factura.feature")
@@ -37,6 +41,7 @@ def casos_cargados_desde_excel(driver, execution_context):
     """
     Carga los casos ejecutables desde el Excel y los guarda en el contexto.
 
+    Crea el run_dir único para esta corrida (UNA sola vez para todos los casos).
     Solo se procesan filas marcadas con ejecutar = SI.
     Si no hay casos ejecutables, el test se omite (skip).
     """
@@ -46,6 +51,11 @@ def casos_cargados_desde_excel(driver, execution_context):
     casos = get_executable_factura_cases()
     execution_context.set_dato("casos_factura", casos)
     execution_context.set_dato("resultados_factura", [])
+
+    # Crear carpeta de corrida única para TODOS los casos de esta ejecución
+    run_dir = create_run_output_dir("factura")
+    execution_context.set_dato("run_dir_factura", str(run_dir))
+    logger.info(f"[FACTURA STEPS] Run dir creado: {run_dir}")
 
     if not casos:
         pytest.skip("No hay casos ejecutables en el Excel (ninguna fila con ejecutar=SI).")

@@ -25,6 +25,7 @@ from app.pages.nota_credito.nota_credito_impuestos_page import NotaCreditoImpues
 from app.pages.nota_credito.nota_credito_page import NotaCreditoPage
 from app.pages.nota_credito.nota_credito_receptor_page import NotaCreditoReceptorPage
 from app.utils.logger import get_logger
+from app.utils.output_manager import create_case_output_dir, get_screenshot_dir
 
 logger = get_logger(__name__)
 
@@ -55,12 +56,24 @@ class NotaCreditoFlow(BaseFlow):
         if tipo_relacion:
             logger.info(f"[NC FLOW] [{caso_id}] Tipo relacion: {tipo_relacion}")
 
-        evidence_dir = Path("outputs") / "nota_credito" / caso_id / "screenshots"
-        try:
-            evidence_dir.mkdir(parents=True, exist_ok=True)
-            self.context.set_dato("evidence_dir_nc", str(evidence_dir))
-        except Exception as exc:
-            logger.warning(f"[NC FLOW] No se pudo crear evidence_dir: {exc}")
+        # --- Crear directorio de caso dentro del run_dir de esta corrida ---
+        run_dir_str = self.context.get_dato("run_dir_nc")
+        if run_dir_str:
+            run_dir = Path(run_dir_str)
+        else:
+            # Retrocompatibilidad: si el step no creó run_dir, usar ruta sin timestamp
+            from app.utils.output_manager import _PROJECT_ROOT
+            run_dir = _PROJECT_ROOT / "outputs" / "nota_credito"
+            run_dir.mkdir(parents=True, exist_ok=True)
+
+        row_index = self.context.get_dato("nc_row_index", 0)
+        case_dir = create_case_output_dir(run_dir, caso_id, row_index=row_index)
+        screenshot_dir = get_screenshot_dir(case_dir)
+
+        # Registrar en contexto para uso en NotaCreditoDescargaFlow
+        self.context.set_dato("evidence_dir_nc", str(screenshot_dir))
+        self.context.set_dato("case_dir_nc", str(case_dir))
+        logger.info(f"[NC FLOW] [{caso_id}] Case dir: {case_dir}")
 
         self._registrar_inicio()
 
@@ -73,6 +86,8 @@ class NotaCreditoFlow(BaseFlow):
 
             logger.info(f"[NC FLOW] [{caso_id}] Paso 2: Verificar pantalla.")
             nc_page = NotaCreditoPage(self.driver)
+            # Inyectar ruta de screenshots con timestamp para esta corrida
+            nc_page._screenshot_dir = screenshot_dir
             nc_page.wait_for_pantalla_nota_credito()
             self._registrar_paso("pantalla_nc_cargada", "exitoso")
             nc_page.tomar_evidencia_pantalla(caso_id, "01_pantalla_nc_cargada")
@@ -199,30 +214,27 @@ class NotaCreditoFlow(BaseFlow):
             logger.info(f"[NC FLOW] [{caso_id}] Paso 10: Validar resultado.")
             self._validar_resultado()
 
-            descargar_pdf = test_data.get("descargar_pdf", False)
-            descargar_xml = test_data.get("descargar_xml", False)
-            if descargar_pdf or descargar_xml:
-                logger.info(f"[NC FLOW] [{caso_id}] Paso 11: Descargar documentos.")
-                tipos = []
-                if descargar_pdf:
-                    tipos.append("pdf")
-                if descargar_xml:
-                    tipos.append("xml")
-                descarga_flow = NotaCreditoDescargaFlow(self.driver, self.context)
-                descarga_flow.run(tipos=tipos)
-                nc_page.tomar_evidencia_pantalla(caso_id, "10_descarga_completada")
+            # ----------------------------------------------------------
+            # PASO 11: Descargar PDF y XML del visor de timbrado
+            # ----------------------------------------------------------
+            logger.info(f"[NC FLOW] [{caso_id}] Paso 11: Descargar documentos.")
+            descarga_flow = NotaCreditoDescargaFlow(self.driver, self.context)
+            descarga_flow.run(tipos=["pdf", "xml"])
+            nc_page.tomar_evidencia_pantalla(caso_id, "10_descarga_completada")
 
             logger.info(f"[NC FLOW] [{caso_id}] Flujo completado exitosamente.")
-            self._generar_reporte(caso_id, test_data, "exitoso")
+            self._generar_reporte(caso_id, test_data, "exitoso", case_dir=case_dir)
             return self._marcar_exitoso()
 
         except Exception as exc:
             logger.exception(f"[NC FLOW] [{caso_id}] Error: {exc}")
             try:
-                NotaCreditoPage(self.driver).tomar_evidencia_pantalla(caso_id, "error_nc_flow")
+                err_page = NotaCreditoPage(self.driver)
+                err_page._screenshot_dir = screenshot_dir
+                err_page.tomar_evidencia_pantalla(caso_id, "error_nc_flow")
             except Exception:
                 pass
-            self._generar_reporte(caso_id, test_data, "fallido", str(exc))
+            self._generar_reporte(caso_id, test_data, "fallido", str(exc), case_dir)
             time.sleep(10)
             return self._marcar_fallido(str(exc))
 
@@ -251,16 +263,12 @@ class NotaCreditoFlow(BaseFlow):
         return timbrado_flow.run()
 
     def _validar_resultado(self) -> None:
-        from app.pages.nota_credito.nota_credito_resultado_page import NotaCreditoResultadoPage
-        resultado_page = NotaCreditoResultadoPage(self.driver)
-        uuid_nc = resultado_page.get_uuid_cfdi()
-        if uuid_nc:
-            self.context.set_dato("uuid_nota_credito", uuid_nc)
-            self._guardar_resultado("uuid_nota_credito", uuid_nc)
-            logger.info(f"[NC FLOW] UUID Nota de Credito: {uuid_nc}")
+        # El UUID ya fue capturado en NotaCreditoTimbradoFlow (con timeout=2).
+        # Solo registramos el paso usando el valor que ya está en contexto.
+        uuid_nc = self.context.get_dato("uuid_nota_credito", "")
         self._registrar_paso("validar_resultado_nc", "exitoso", f"uuid_nota_credito={uuid_nc!r}")
 
-    def _generar_reporte(self, caso_id: str, test_data: dict, estado: str, error: str = "") -> None:
+    def _generar_reporte(self, caso_id: str, test_data: dict, estado: str, error: str = "", case_dir=None) -> None:
         """Genera reporte JSON con los campos del Excel y el estado final del caso."""
         import json
         from datetime import datetime
@@ -294,7 +302,11 @@ class NotaCreditoFlow(BaseFlow):
         }
 
         try:
-            output_dir = Path("outputs") / "nota_credito" / caso_id
+            # Usar case_dir si se proporcionó (ruta con timestamp), sino fallback legacy
+            if case_dir is not None:
+                output_dir = Path(case_dir)
+            else:
+                output_dir = Path("outputs") / "nota_credito" / caso_id
             output_dir.mkdir(parents=True, exist_ok=True)
             ruta = output_dir / f"reporte_{caso_id}.json"
             with open(ruta, "w", encoding="utf-8") as f:

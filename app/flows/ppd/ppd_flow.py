@@ -1,21 +1,23 @@
-"""
-ppd_flow.py - Flujo principal de emisión de Factura PPD.
+﻿"""
+ppd_flow.py - Flujo principal de emision de CFDI con metodo de pago PPD.
 
 PPD = Pago en Parcialidades o Diferido.
-Un CFDI con método de pago PPD indica que el pago se realizará
-en una fecha futura o en parcialidades, por lo que requerirá
-un Complemento de Pago cuando se reciba el pago.
+Un CFDI PPD es una Factura con metodo_pago=PPD. Utiliza exactamente el
+mismo formulario de emision que Factura en el portal FACTO 8.
+
+Thin wrapper sobre CfdiManualFlow:
+  - Garantiza que metodo_pago siempre sea 'PPD'.
+  - Lee datos desde tests/test_data/ppd/ppd_casos.xlsx (hoja PPD).
+  - Genera outputs en outputs/ppd/{timestamp}/{caso_id}/.
+  - NO copia Page Objects de Factura: los reutiliza directamente.
 
 Uso:
     from app.flows.ppd.ppd_flow import PPDFlow
     flow = PPDFlow(driver, execution_context)
-    result = flow.run(test_data={...})
+    result = flow.ejecutar_ppd(caso)
 """
 from app.core.base_flow import BaseFlow
-from app.flows.common.navigation_flow import NavigationFlow
-from app.pages.common.loader_page import LoaderPage
-from app.pages.ppd.ppd_page import PPDPage
-from app.pages.ppd.ppd_resultado_page import PPDResultadoPage
+from app.flows.common.cfdi_manual_flow import CfdiManualFlow
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,68 +25,67 @@ logger = get_logger(__name__)
 
 class PPDFlow(BaseFlow):
     """
-    Flujo de emisión de Factura con método de pago PPD
-    (Pago en Parcialidades o Diferido).
+    Flujo de emision de CFDI con metodo de pago PPD.
 
-    El UUID generado por este flujo se utiliza en ComplementoPagoFlow.
+    Thin wrapper sobre CfdiManualFlow con tipo_flujo='ppd'.
+
+    La unica responsabilidad propia de PPDFlow es garantizar que
+    el campo metodo_pago del caso sea 'PPD' antes de delegar.
+
+    Uso:
+        flow = PPDFlow(driver, execution_context)
+        result = flow.ejecutar_ppd(caso)       # data-driven desde Excel
+        result = flow.run(caso=caso)            # llamada directa
     """
 
     def run(self, **kwargs) -> dict:
         """
-        Ejecuta el flujo completo de emisión de Factura PPD.
+        Punto de entrada estandar del BaseFlow.
+
+        Acepta 'caso' o 'test_data' (retrocompatibilidad con step_ppd.py).
 
         Args:
-            test_data: (dict) Datos del PPD.
-                       Ver tests/test_data/ppd/ppd_valido.json
+            caso:      Dict plano del Excel PPD.
+            test_data: Alias de 'caso' para compatibilidad con step_ppd legacy.
 
         Returns:
-            Resultado con uuid_cfdi_ppd para uso en Complemento de Pago.
+            Resultado estandar BaseFlow: { "estado", "datos", "error" }
         """
-        self._registrar_inicio()
-        test_data: dict = kwargs.get("test_data", {})
+        caso = kwargs.get("caso", kwargs.get("test_data", {}))
+        return self.ejecutar_ppd(caso)
 
-        try:
-            # --- Paso 1: Navegar al módulo PPD ---
-            nav_flow = NavigationFlow(self.driver, self.context)
-            nav_result = nav_flow.run(destino="ppd")
-            if nav_result["estado"] == "fallido":
-                return self._marcar_fallido(f"Navegación a PPD falló: {nav_result['error']}")
-            self._registrar_paso("navegar_ppd", "exitoso")
+    def ejecutar_ppd(self, caso: dict) -> dict:
+        """
+        Ejecuta el flujo completo de emision de CFDI PPD.
 
-            # --- Paso 2: Llenar formulario PPD ---
-            ppd_page = PPDPage(self.driver)
-            loader_page = LoaderPage(self.driver)
+        Regla de negocio PPD:
+          - metodo_pago DEBE ser 'PPD'. Si el Excel lo trae vacio o diferente,
+            este metodo lo fuerza a 'PPD' con un warning antes de continuar.
 
-            # TODO: Implementar con selectores reales del portal
-            # ppd_page.fill_rfc_receptor(test_data.get("rfc_receptor", ""))
-            # ppd_page.fill_nombre_receptor(test_data.get("nombre_receptor", ""))
-            # ppd_page.select_uso_cfdi(test_data.get("uso_cfdi", ""))
-            # ppd_page.select_metodo_pago_ppd()   # Siempre PPD
-            # ppd_page.select_forma_pago(test_data.get("forma_pago", "99"))  # Por definir
-            # ppd_page.fill_descripcion(test_data.get("descripcion", ""))
-            # ppd_page.fill_importe(str(test_data.get("importe", "")))
-            # ppd_page.click_continuar()
-            # loader_page.wait_for_loader_to_disappear()
+        Delega a CfdiManualFlow con tipo_flujo='ppd', que:
+          - Lee run_dir_ppd del contexto (creado por ppd_steps.py).
+          - Navega al modulo ppd del portal.
+          - Usa los Page Objects de app/pages/factura/ (mismo formulario).
+          - Genera outputs en outputs/ppd/{timestamp}/{caso_id}/.
 
-            self._registrar_paso("llenar_formulario_ppd", "omitido", "TODO: implementar")
-            self._tomar_screenshot("02_formulario_ppd")
+        Args:
+            caso: Dict plano del Excel PPD (columnas de ppd_casos.xlsx).
 
-            # --- Paso 3: Capturar resultado ---
-            resultado_page = PPDResultadoPage(self.driver)
+        Returns:
+            { "estado": "exitoso"|"fallido", "datos": dict, "error": str|None }
+        """
+        # â”€â”€ Garantizar metodo_pago = PPD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        caso_ppd = {**caso}
+        metodo_actual = str(caso_ppd.get("metodo_pago", "")).strip().upper()
+        if not metodo_actual.startswith("PPD"):
+            logger.warning(
+                "[PPD FLOW] metodo_pago='%s' no es PPD â€” forzando a 'PPD'.",
+                metodo_actual or "(vacio)",
+            )
+            caso_ppd["metodo_pago"] = "PPD"
 
-            # TODO: Verificar timbrado y capturar UUID
-            # if not resultado_page.is_timbrado_exitoso():
-            #     return self._marcar_fallido(resultado_page.get_error_message())
-            # uuid_ppd = resultado_page.get_uuid_cfdi()
-            # self._guardar_resultado("uuid_cfdi_ppd", uuid_ppd)
-            # self.context.set_dato("uuid_cfdi_ppd", uuid_ppd)  # Usado por complemento_pago
+        # â”€â”€ Delegar al flujo comun â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        common_flow = CfdiManualFlow(self.driver, self.context)
+        return common_flow.ejecutar_cfdi_manual(caso=caso_ppd, tipo_flujo="ppd")
 
-            self._registrar_paso("obtener_uuid_ppd", "omitido", "TODO: implementar")
-            self._tomar_screenshot("03_resultado_ppd")
 
-            return self._marcar_exitoso()
-
-        except Exception as exc:
-            logger.exception(f"Error en PPDFlow: {exc}")
-            self._tomar_screenshot("error_ppd")
-            return self._marcar_fallido(str(exc))

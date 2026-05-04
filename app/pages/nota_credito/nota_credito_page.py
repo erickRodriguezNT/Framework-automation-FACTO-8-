@@ -179,15 +179,23 @@ class NotaCreditoPage(BasePage):
         blocking: bool = True,
     ) -> str | None:
         """
-        Captura un screenshot y lo guarda en outputs/nota_credito/{caso_id}/screenshots/.
+        Captura un screenshot y lo guarda en el directorio de evidencias del caso.
+
+        Prioridad de ruta:
+        1. ``self._screenshot_dir`` — seteado por el flow cuando usa output_manager
+           (ej: ``outputs/nota_credito/20260429_215010/NC_001/screenshots/``).
+        2. Ruta legacy: ``outputs/nota_credito/{caso_id}/screenshots/`` (retrocompatibilidad).
 
         NOTA: blocking=False está desactivado — Selenium WebDriver no es thread-safe.
         El parámetro se mantiene por compatibilidad de firma pero siempre es síncrono.
-
-        parents[3] sube: nota_credito/ -> pages/ -> app/ -> automation_framework/
         """
-        automation_root = Path(__file__).resolve().parents[3]
-        directorio = automation_root / "outputs" / "nota_credito" / caso_id / "screenshots"
+        # Si el flow ya configuró la ruta con run_dir/case_dir, usarla.
+        screenshot_dir = getattr(self, "_screenshot_dir", None)
+        if screenshot_dir is None:
+            # Retrocompatibilidad: ruta sin timestamp
+            automation_root = Path(__file__).resolve().parents[3]
+            screenshot_dir = automation_root / "outputs" / "nota_credito" / caso_id / "screenshots"
+        directorio = Path(screenshot_dir)
         try:
             return str(self.take_screenshot(nombre_paso, directory=directorio))
         except Exception as exc:
